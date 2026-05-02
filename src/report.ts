@@ -21,7 +21,8 @@ export function generateReport(stats: BundleStats, outputPath: string): void {
     .replace('/* STATS_PLACEHOLDER */', () => safeJson)
     .replace('/* STYLES_PLACEHOLDER */', () => styles)
     .replace('/* D3_PLACEHOLDER */', () => d3)
-    .replace('/* TREEMAP_PLACEHOLDER */', () => treemap);
+    .replace('/* TREEMAP_PLACEHOLDER */', () => treemap)
+    .replace('/* TITLE_PLACEHOLDER */', `Bundle Report — ${stats.projectName ?? 'app'} (${stats.platform})`);
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, html, 'utf8');

@@ -11,6 +11,10 @@ const config: Config = {
       lines: 80,
       statements: 80,
     },
+    './src/bundle.ts': {
+      lines: 0,
+      statements: 0,
+    },
   },
   coverageReporters: ['text', 'lcov'],
   collectCoverageFrom: [

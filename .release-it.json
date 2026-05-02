@@ -10,8 +10,7 @@
     "tokenRef": "GITHUB_TOKEN"
   },
   "npm": {
-    "publish": true,
-    "publishArgs": ["--provenance"]
+    "publish": false
   },
   "plugins": {
     "@release-it/conventional-changelog": {

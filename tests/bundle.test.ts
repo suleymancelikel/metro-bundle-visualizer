@@ -33,7 +33,7 @@ describe('buildTempConfigContent()', () => {
       const content = buildTempConfigContent(makeOptions({ metroConfig: null }));
 
       expect(content).toContain("require('@react-native/metro-config')");
-      expect(content).toContain("require('metro-bundle-visualizer/serializer')");
+      expect(content).toMatch(/require\(.*serializer\.js.*\)/);
     });
   });
 

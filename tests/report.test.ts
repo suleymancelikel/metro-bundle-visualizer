@@ -8,6 +8,7 @@ const mockStats: BundleStats = {
   generatedAt: '2026-05-01T00:00:00.000Z',
   platform: 'ios',
   totalBytes: 1500,
+  projectName: 'MyApp',
   modules: [
     { path: '/app/index.js', size: 800, package: '<app>' },
     { path: '/app/node_modules/react/index.js', size: 700, package: 'react' },
@@ -48,6 +49,15 @@ describe('generateReport', () => {
       const html = fs.readFileSync(outputPath, 'utf8');
       expect(html).toContain('"platform":"ios"');
       expect(html).toContain('"totalBytes":1500');
+    });
+  });
+
+  it('sets the title to include projectName and platform', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('<title>Bundle Report — MyApp (ios)</title>');
     });
   });
 

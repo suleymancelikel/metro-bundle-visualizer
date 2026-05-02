@@ -86,6 +86,7 @@ async function main(): Promise<void> {
   }
 
   const stats = JSON.parse(fs.readFileSync(statsPath, 'utf8'));
+  stats.projectName = path.basename(detected.projectRoot);
   const totalMB = (stats.totalBytes / 1024 / 1024).toFixed(2);
   console.log(`\nBundle complete — ${totalMB} MB (${stats.modules.length} modules)`);
 

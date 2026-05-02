@@ -14,6 +14,7 @@ export interface BundleStats {
   platform: string;
   totalBytes: number;
   modules: ModuleStats[];
+  projectName?: string;
 }
 
 // ─── Internal Metro type ──────────────────────────────────────────────────────

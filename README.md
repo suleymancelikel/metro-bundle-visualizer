@@ -3,12 +3,11 @@
 [![npm version](https://img.shields.io/npm/v/metro-bundle-visualizer?color=blue)](https://www.npmjs.com/package/metro-bundle-visualizer)
 [![npm downloads](https://img.shields.io/npm/dw/metro-bundle-visualizer)](https://www.npmjs.com/package/metro-bundle-visualizer)
 [![CI](https://github.com/suleymancelikel/metro-bundle-visualizer/actions/workflows/ci.yml/badge.svg)](https://github.com/suleymancelikel/metro-bundle-visualizer/actions/workflows/ci.yml)
-[![codecov](https://codecov.io/gh/suleymancelikel/metro-bundle-visualizer/branch/main/graph/badge.svg)](https://codecov.io/gh/suleymancelikel/metro-bundle-visualizer)
 [![license](https://img.shields.io/npm/l/metro-bundle-visualizer)](LICENSE)
 
 Interactive bundle size visualizer for React Native — works with RN 0.73+, New Architecture, zero config.
 
-<!-- demo GIF placeholder — add once tool is running against a real project -->
+![Bundle report screenshot](assets/screenshot.png)
 
 ## Quick Start
 
@@ -80,6 +79,29 @@ Opened in browser.
 Instead of post-processing source maps (broken on Metro 0.83+), this tool injects a custom serializer into Metro's bundling pipeline. Each module's `output[0].data.code` — the exact bytes Metro writes to the bundle — is captured and attributed to its package. The result is a self-contained HTML file with a D3.js treemap.
 
 The bundle output is **never altered**.
+
+## Metro 0.83+ compatibility
+
+Most bundle analysis tools for React Native rely on source maps. Metro 0.83 changed how column offsets are emitted, which breaks source-map-based attribution on RN 0.82+.
+
+This tool never touches source maps. It hooks into Metro's serializer pipeline and reads `graph.dependencies` directly — the exact bytes Metro is about to write to the bundle. Sizes are accurate regardless of Metro version.
+
+**Expo async metro config.** If your `metro.config.js` exports an async function (common with `withNativeWind` and other Expo config plugins), the temporary config this tool injects needs to resolve it synchronously. Wrap it in a sync IIFE in a separate base config file, then import that:
+
+```js
+// metro.config.base.js
+const cfg = require('./metro.config.original');
+module.exports = typeof cfg === 'function' ? cfg() : cfg;
+```
+
+Or inline it:
+
+```js
+module.exports = (() => {
+  const cfg = require('./metro.config.base');
+  return typeof cfg === 'function' ? cfg() : cfg;
+})();
+```
 
 ## FAQ
 

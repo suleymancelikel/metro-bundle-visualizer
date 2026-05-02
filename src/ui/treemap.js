@@ -32,14 +32,16 @@
     .sort((a, b) => (b.value || 0) - (a.value || 0));
 
   // --- Renk skalası ---
-  const maxSize = root.children ? Math.max(...root.children.map(c => c.value || 0)) : 1;
-
+  const COLOR_SCHEME = d3.schemeTableau10;
+  function hashName(str) {
+    let h = 0;
+    for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
+    return Math.abs(h);
+  }
   function getColor(node) {
     if (!node.data || !node.data.name) return '#555';
     if (node.data.name === '<app>') return '#3b82f6';
-    const ratio = maxSize > 0 ? (node.value || 0) / maxSize : 0;
-    // green → yellow → red
-    return d3.interpolateRgb('#1a6b3c', '#dc2626')(ratio);
+    return COLOR_SCHEME[hashName(node.data.name) % COLOR_SCHEME.length];
   }
 
   // --- Header bilgileri ---
@@ -49,7 +51,7 @@
 
   if (totalSizeEl) totalSizeEl.textContent = '· ' + formatBytes(stats.totalBytes) + ' total';
   if (metaEl) metaEl.textContent = 'Platform: ' + stats.platform + ' · ' + stats.modules.length + ' modules';
-  if (footerEl) footerEl.textContent = 'Generated ' + new Date(stats.generatedAt).toLocaleString();
+  if (footerEl) footerEl.textContent = 'Generated ' + new Date(stats.generatedAt).toLocaleString() + ' · Sizes are pre-minification (~20–40% larger than shipped binary)';
 
   // --- Tooltip ---
   const tooltip = document.createElement('div');
@@ -75,12 +77,24 @@
   function render(filterText) {
     currentFilter = filterText.toLowerCase();
     g.selectAll('*').remove();
+    svg.select('.treemap-empty-state').remove();
 
     const filteredChildren = root.children
       ? root.children.filter(c =>
           !currentFilter || (c.data.name || '').toLowerCase().includes(currentFilter)
         )
       : [];
+
+    if (filteredChildren.length === 0) {
+      svg.append('text')
+        .attr('class', 'treemap-empty-state')
+        .attr('x', '50%')
+        .attr('y', '50%')
+        .attr('text-anchor', 'middle')
+        .attr('dominant-baseline', 'middle')
+        .text(currentFilter ? 'No packages match "' + currentFilter + '"' : 'No data');
+      return;
+    }
 
     const filteredRoot = d3.hierarchy({
       name: 'root',
@@ -118,6 +132,18 @@
         return name;
       })
       .attr('font-size', d => Math.min(12, Math.max(9, (d.x1 - d.x0) / 8)));
+
+    nodes.append('text')
+      .attr('x', 4)
+      .attr('y', 28)
+      .text(d => {
+        const w = d.x1 - d.x0;
+        const h = d.y1 - d.y0;
+        if (w <= 80 || h <= 30) return '';
+        return formatBytes(d.value || 0);
+      })
+      .attr('font-size', 10)
+      .attr('fill', 'rgba(255,255,255,0.75)');
 
     // Hover ve click
     nodes
@@ -166,11 +192,12 @@
       for (const f of topFiles) {
         const li = document.createElement('li');
         const parts = (f.path || '').replace(/\\/g, '/').split('/');
-        const name = parts[parts.length - 1] || f.path || '';
-        // textContent kullan — XSS yok
+        const displayName = parts.length >= 2
+          ? parts.slice(-2).join('/')
+          : parts[parts.length - 1] || f.path || '';
         const nameSpan = document.createElement('span');
         nameSpan.title = f.path || '';
-        nameSpan.textContent = name;
+        nameSpan.textContent = displayName;
         const sizeSpan = document.createElement('span');
         sizeSpan.textContent = formatBytes(f.size || 0);
         li.appendChild(nameSpan);
@@ -189,12 +216,16 @@
   }
 
   // --- Resize ---
+  let resizeTimer;
   if (typeof ResizeObserver !== 'undefined') {
     const ro = new ResizeObserver(() => {
-      width = container.clientWidth || width;
-      height = container.clientHeight || height;
-      svg.attr('width', width).attr('height', height);
-      render(currentFilter);
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        width = container.clientWidth || width;
+        height = container.clientHeight || height;
+        svg.attr('width', width).attr('height', height);
+        render(currentFilter);
+      }, 50);
     });
     ro.observe(container);
   }

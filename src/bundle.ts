@@ -44,9 +44,11 @@ try {
 }`
       : '';
 
+  const serializerPath = path.join(__dirname, 'serializer.js');
+
   return `'use strict';
 const { mergeConfig } = require('@react-native/metro-config');
-const { captureSerializer } = require('metro-bundle-visualizer/serializer');
+const { captureSerializer } = require(${JSON.stringify(serializerPath)});
 
 // userConfig: handle async format
 let rawConfig = {};
