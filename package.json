@@ -1,0 +1,87 @@
+{
+  "name": "metro-bundle-visualizer",
+  "version": "0.1.0",
+  "description": "Interactive bundle size visualizer for React Native — works with RN 0.73+, New Architecture, zero config",
+  "bin": {
+    "metro-bundle-visualizer": "./dist/cli.js"
+  },
+  "main": "./dist/cli.js",
+  "exports": {
+    ".": "./dist/cli.js",
+    "./serializer": "./dist/serializer.js"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "ts-node src/cli.ts",
+    "test": "jest",
+    "lint": "eslint src --ext .ts",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write \"src/**/*.ts\"",
+    "prepublishOnly": "npm run build && npm test",
+    "release": "release-it"
+  },
+  "dependencies": {
+    "commander": "^12.0.0",
+    "open": "^8.4.2"
+  },
+  "devDependencies": {
+    "@release-it/conventional-changelog": "^11.0.0",
+    "@types/jest": "^29.5.0",
+    "@types/node": "^20.0.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "d3": "^7.9.0",
+    "eslint": "^8.57.0",
+    "release-it": "^20.0.1",
+    "ts-jest": "^29.0.0",
+    "ts-node": "^10.9.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@react-native/metro-config": ">=0.73.0",
+    "metro": ">=0.73.0"
+  },
+  "peerDependenciesMeta": {
+    "@react-native/metro-config": {
+      "optional": false
+    },
+    "metro": {
+      "optional": false
+    }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "react-native",
+    "metro",
+    "bundle",
+    "visualizer",
+    "treemap",
+    "bundle-size",
+    "cli",
+    "debug",
+    "performance",
+    "new-architecture"
+  ],
+  "license": "MIT",
+  "homepage": "https://github.com/suleymancelikel/metro-bundle-visualizer#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/suleymancelikel/metro-bundle-visualizer.git"
+  },
+  "bugs": {
+    "url": "https://github.com/suleymancelikel/metro-bundle-visualizer/issues"
+  },
+  "publishConfig": {
+    "access": "public",
+    "provenance": true
+  },
+  "sideEffects": false
+}
