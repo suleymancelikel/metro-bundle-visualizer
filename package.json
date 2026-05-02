@@ -1,6 +1,6 @@
 {
   "name": "metro-bundle-visualizer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Interactive bundle size visualizer for React Native — works with RN 0.73+, New Architecture, zero config",
   "bin": {
     "metro-bundle-visualizer": "./dist/cli.js"
