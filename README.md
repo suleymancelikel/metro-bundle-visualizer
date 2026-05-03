@@ -27,6 +27,8 @@ npx metro-bundle-visualizer
 npm install -g metro-bundle-visualizer
 ```
 
+Package on npm: [npmjs.com/package/metro-bundle-visualizer](https://www.npmjs.com/package/metro-bundle-visualizer)
+
 ## Usage
 
 ```
