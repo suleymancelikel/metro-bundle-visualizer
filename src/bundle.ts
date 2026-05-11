@@ -13,6 +13,7 @@ export interface BundleOptions {
   dev: boolean;
   statsOutputPath: string;
   resetCache?: boolean;
+  quiet?: boolean;
 }
 
 // ─── buildTempConfigContent ───────────────────────────────────────────────────
@@ -88,6 +89,7 @@ function spawnBundle(
     bundleOutput: string;
     config: string;
     resetCache: boolean;
+    quiet: boolean;
   },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -115,12 +117,16 @@ function spawnBundle(
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
+    const stderrLines: string[] = [];
+
     child.stdout.on('data', (chunk: Buffer) => {
-      const lines = chunk.toString().split('\n');
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (trimmed) {
-          process.stdout.write(`\r${trimmed}`);
+      if (!opts.quiet) {
+        const lines = chunk.toString().split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed) {
+            process.stdout.write(`\r${trimmed}`);
+          }
         }
       }
     });
@@ -129,8 +135,11 @@ function spawnBundle(
       const lines = chunk.toString().split('\n');
       for (const line of lines) {
         const trimmed = line.trim();
-        // Filter WARN lines — don't show them
-        if (trimmed && !trimmed.startsWith('WARN')) {
+        if (trimmed) {
+          stderrLines.push(trimmed);
+          if (stderrLines.length > 20) stderrLines.shift();
+        }
+        if (trimmed && !trimmed.toLowerCase().startsWith('warn')) {
           process.stderr.write(`${trimmed}\n`);
         }
       }
@@ -140,7 +149,8 @@ function spawnBundle(
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`react-native bundle exited with code ${code ?? 'null'}`));
+        const detail = stderrLines.length > 0 ? `\n${stderrLines.join('\n')}` : '';
+        reject(new Error(`react-native bundle exited with code ${code ?? 'null'}${detail}`));
       }
     });
 
@@ -165,6 +175,7 @@ export async function runBundle(options: BundleOptions): Promise<void> {
     platform,
     dev,
     resetCache = false,
+    quiet = false,
   } = options;
 
   const tempConfig = writeTempConfig(options);
@@ -178,9 +189,9 @@ export async function runBundle(options: BundleOptions): Promise<void> {
       bundleOutput,
       config: tempConfig,
       resetCache,
+      quiet,
     });
   } finally {
-    // Clean up temp files regardless of success or failure
     for (const file of [tempConfig, bundleOutput]) {
       try {
         fs.unlinkSync(file);
