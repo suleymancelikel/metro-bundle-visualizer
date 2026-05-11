@@ -32,6 +32,7 @@ function readAsset(filename: string): string {
   try {
     return fs.readFileSync(path.join(UI_DIR, filename), 'utf8');
   } catch {
+    process.stderr.write(`metro-bundle-visualizer: warning: missing UI asset: ${filename}\n`);
     return '';
   }
 }

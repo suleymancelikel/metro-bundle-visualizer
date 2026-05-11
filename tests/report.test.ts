@@ -70,6 +70,22 @@ describe('generateReport', () => {
     });
   });
 
+  it('writes a stderr warning when a UI asset is missing', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      const stderrSpy = jest.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+      // In the test environment __dirname resolves to src/, so d3.min.js is absent
+      generateReport(mockStats, outputPath);
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('missing UI asset:'),
+      );
+
+      stderrSpy.mockRestore();
+    });
+  });
+
   it('escapes </script> sequences in injected JSON (XSS prevention)', () => {
     const maliciousStats: BundleStats = {
       ...mockStats,
