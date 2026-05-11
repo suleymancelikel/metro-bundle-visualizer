@@ -43,3 +43,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Verify dist/ui assets
+        run: node scripts/verify-dist.js
