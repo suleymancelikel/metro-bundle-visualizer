@@ -27,6 +27,12 @@
 
   const hierarchyData = { name: 'root', children: [...pkgMap.values()] };
 
+  // Pre-compute lowercase path cache once at init (not per keystroke)
+  const pkgFilePathCache = new Map();
+  for (const [name, pkg] of pkgMap) {
+    pkgFilePathCache.set(name, (pkg.files || []).map(f => (f.path || '').toLowerCase()));
+  }
+
   const root = d3.hierarchy(hierarchyData)
     .sum(d => d.size || 0)
     .sort((a, b) => (b.value || 0) - (a.value || 0));
@@ -80,9 +86,12 @@
     svg.select('.treemap-empty-state').remove();
 
     const filteredChildren = root.children
-      ? root.children.filter(c =>
-          !currentFilter || (c.data.name || '').toLowerCase().includes(currentFilter)
-        )
+      ? root.children.filter(c => {
+          if (!currentFilter) return true;
+          if ((c.data.name || '').toLowerCase().includes(currentFilter)) return true;
+          const paths = pkgFilePathCache.get(c.data.name) || [];
+          return paths.some(p => p.includes(currentFilter));
+        })
       : [];
 
     if (filteredChildren.length === 0) {
@@ -208,10 +217,13 @@
   }
 
   // --- Search ---
+  let searchTimer;
   const searchEl = document.getElementById('search');
   if (searchEl) {
     searchEl.addEventListener('input', function () {
-      render(this.value);
+      clearTimeout(searchTimer);
+      const value = this.value;
+      searchTimer = setTimeout(() => render(value), 150);
     });
   }
 
