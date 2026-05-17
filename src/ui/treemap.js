@@ -277,13 +277,42 @@
   // --- Search ---
   let searchTimer;
   const searchEl = document.getElementById('search');
+  const searchClearEl = document.getElementById('search-clear');
+
   if (searchEl) {
     searchEl.addEventListener('input', function () {
       clearTimeout(searchTimer);
       const value = this.value;
+      if (searchClearEl) searchClearEl.style.display = value ? 'block' : 'none';
       searchTimer = setTimeout(() => render(value), 150);
     });
   }
+
+  if (searchClearEl) {
+    searchClearEl.addEventListener('click', () => {
+      if (searchEl) {
+        searchEl.value = '';
+        searchEl.dispatchEvent(new Event('input'));
+      }
+      searchClearEl.style.display = 'none';
+    });
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.key === '/' && document.activeElement !== searchEl) {
+      e.preventDefault();
+      if (searchEl) searchEl.focus();
+    }
+    if (e.key === 'Escape') {
+      if (document.activeElement === searchEl) {
+        searchEl.blur();
+        if (searchEl.value) {
+          searchEl.value = '';
+          searchEl.dispatchEvent(new Event('input'));
+        }
+      }
+    }
+  });
 
   // --- Resize ---
   let resizeTimer;

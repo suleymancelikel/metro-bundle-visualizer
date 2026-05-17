@@ -97,6 +97,14 @@ body {
   box-shadow: 0 0 0 3px var(--accent-focus);
 }
 #search::placeholder { color: var(--text-3); }
+.search-clear {
+  position: absolute; right: 8px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-3); font-size: 14px; line-height: 1;
+  padding: 2px 4px; border-radius: 3px;
+  transition: color 100ms;
+}
+.search-clear:hover { color: var(--text-1); }
 
 .main { display: flex; flex: 1; overflow: hidden; }
 #treemap-container { flex: 1; overflow: hidden; cursor: default; }
