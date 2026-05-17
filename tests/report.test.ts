@@ -86,6 +86,17 @@ describe('generateReport', () => {
     });
   });
 
+  it('injects CSS design tokens into generated report', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('--bg-0:');
+      expect(html).toContain('--accent:');
+      expect(html).toContain('--text-1:');
+    });
+  });
+
   it('escapes </script> sequences in injected JSON (XSS prevention)', () => {
     const maliciousStats: BundleStats = {
       ...mockStats,
