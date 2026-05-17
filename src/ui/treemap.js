@@ -82,6 +82,8 @@
 
   const g = svg.append('g');
   let currentFilter = '';
+  let selectedNode = null;
+  let tooltipRafId = null;
 
   // --- Render function ---
   function render(filterText) {
@@ -173,8 +175,10 @@
 
         tooltip.classList.add('visible');
 
+        if (tooltipRafId) cancelAnimationFrame(tooltipRafId);
         tooltip.style.transform = 'translate(-9999px,-9999px)';
-        requestAnimationFrame(() => {
+        tooltipRafId = requestAnimationFrame(() => {
+          tooltipRafId = null;
           const pad = 14;
           const tw = tooltip.offsetWidth;
           const th = tooltip.offsetHeight;
@@ -188,8 +192,6 @@
       .on('mouseleave', function () {
         tooltip.classList.remove('visible');
       });
-
-    let selectedNode = null;
 
     nodes.on('click', function (_event, d) {
       if (selectedNode) d3.select(selectedNode).classed('selected', false);
@@ -314,7 +316,4 @@
     return { value: String(bytes), unit: 'B' };
   }
 
-  function pct(part, total) {
-    return total > 0 ? (part / total * 100).toFixed(1) + '%' : '0%';
-  }
 })();
