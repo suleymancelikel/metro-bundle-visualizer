@@ -11,6 +11,8 @@
   --accent: #ff6b35;
   --accent-soft: rgba(255,107,53,0.12);
   --accent-focus: rgba(255,107,53,0.25);
+  --accent-light: #ff8a5c;
+  --bg-header-stop: #101012;
   --warn: #f5a524;
   --danger: #f25555;
   --success: #4ade80;
@@ -35,7 +37,7 @@ body {
   align-items: center;
   gap: 24px;
   padding: 12px 20px;
-  background: linear-gradient(180deg, var(--bg-1) 0%, #101012 100%);
+  background: linear-gradient(180deg, var(--bg-1) 0%, var(--bg-header-stop) 100%);
   border-bottom: 1px solid var(--border);
   flex-shrink: 0;
 }
@@ -46,7 +48,7 @@ body {
   padding: 2px 7px;
   border-radius: 4px;
   background: var(--accent-soft);
-  color: #ff8a5c;
+  color: var(--accent-light);
   font-size: 11px;
   font-weight: 500;
   letter-spacing: 0.04em;
