@@ -4,7 +4,7 @@
   const stats = window.__BUNDLE_STATS__;
   if (!stats) return;
 
-  // --- XSS-güvenli escape helper ---
+  // --- XSS-safe escape helper ---
   function escapeHtml(str) {
     return String(str)
       .replace(/&/g, '&amp;')
@@ -13,7 +13,7 @@
       .replace(/>/g, '&gt;');
   }
 
-  // --- Veri aggregasyonu ---
+  // --- Data aggregation ---
   const pkgMap = new Map();
   for (const mod of stats.modules) {
     const existing = pkgMap.get(mod.package);
@@ -37,32 +37,36 @@
     .sum(d => d.size || 0)
     .sort((a, b) => (b.value || 0) - (a.value || 0));
 
-  // --- Renk skalası ---
-  const COLOR_SCHEME = d3.schemeTableau10;
-  function hashName(str) {
-    let h = 0;
-    for (let i = 0; i < str.length; i++) h = (Math.imul(31, h) + str.charCodeAt(i)) | 0;
-    return Math.abs(h);
-  }
-  function getColor(node) {
-    if (!node.data || !node.data.name) return '#555';
-    if (node.data.name === '<app>') return '#3b82f6';
-    return COLOR_SCHEME[hashName(node.data.name) % COLOR_SCHEME.length];
+  // --- Semantic color by package category ---
+  function categoryColor(name) {
+    if (!name)                              return '#3a3a44';
+    if (name === '<app>')                   return '#ff6b35';
+    if (name.startsWith('@react-native/') ||
+        name === 'react-native')            return '#4a5568';
+    if (name.startsWith('@babel/'))         return '#6b46c1';
+    if (name.startsWith('@'))               return '#0891b2';
+    return '#2d6a8c';
   }
 
-  // --- Header bilgileri ---
-  const totalSizeEl = document.getElementById('total-size');
-  const metaEl = document.getElementById('meta');
-  const footerEl = document.getElementById('footer');
+  // --- Wire header ---
+  const heroParts = formatBytesDetailed(stats.totalBytes);
+  const heroValEl  = document.getElementById('hero-value');
+  const heroUnitEl = document.getElementById('hero-unit');
+  const heroSubEl  = document.getElementById('hero-sub');
+  const platformEl = document.getElementById('platform-badge');
+  const metaEl     = document.getElementById('meta');
+  const footerEl   = document.getElementById('footer');
 
-  if (totalSizeEl) totalSizeEl.textContent = '· ' + formatBytes(stats.totalBytes) + ' total';
-  if (metaEl) metaEl.textContent = 'Platform: ' + stats.platform + ' · ' + stats.modules.length + ' modules';
-  if (footerEl) footerEl.textContent = 'Generated ' + new Date(stats.generatedAt).toLocaleString() + ' · Sizes are pre-minification (~20–40% larger than shipped binary)';
+  if (heroValEl)   heroValEl.textContent  = heroParts.value;
+  if (heroUnitEl)  heroUnitEl.textContent = heroParts.unit;
+  if (heroSubEl)   heroSubEl.textContent  = stats.modules.length + ' modules · ' + pkgMap.size + ' packages';
+  if (platformEl)  platformEl.textContent = stats.platform || '';
+  if (metaEl)      metaEl.textContent     = 'platform: ' + (stats.platform || '—');
+  if (footerEl)    footerEl.textContent   = 'Generated ' + new Date(stats.generatedAt).toLocaleString() + ' · Sizes are pre-minification (~20–40% larger than shipped binary)';
 
   // --- Tooltip ---
   const tooltip = document.createElement('div');
   tooltip.className = 'tooltip';
-  tooltip.style.display = 'none';
   document.body.appendChild(tooltip);
 
   // --- SVG setup ---
@@ -79,7 +83,7 @@
   const g = svg.append('g');
   let currentFilter = '';
 
-  // --- Render fonksiyonu ---
+  // --- Render function ---
   function render(filterText) {
     currentFilter = filterText.toLowerCase();
     g.selectAll('*').remove();
@@ -127,88 +131,140 @@
     nodes.append('rect')
       .attr('width', d => Math.max(0, d.x1 - d.x0))
       .attr('height', d => Math.max(0, d.y1 - d.y0))
-      .attr('fill', d => getColor(d))
+      .attr('fill', d => categoryColor(d.data.name))
       .attr('rx', 2);
 
+    // Package name label (top-left)
     nodes.append('text')
-      .attr('x', 4)
-      .attr('y', 14)
+      .attr('class', 'node-label')
+      .attr('x', 6)
+      .attr('y', 15)
       .text(d => {
-        const w = d.x1 - d.x0;
+        const w = d.x1 - d.x0 - 12;
         const name = d.data.name || '';
-        if (w < 40) return '';
-        if (w < 80) return name.split('/').pop() || name;
-        return name;
-      })
-      .attr('font-size', d => Math.min(12, Math.max(9, (d.x1 - d.x0) / 8)));
+        if (w < 30) return '';
+        const maxChars = Math.floor(w / 6.5);
+        if (maxChars < 4) return '';
+        return name.length <= maxChars ? name : name.slice(0, maxChars - 1) + '…';
+      });
 
+    // Size label (second line, only for larger cells)
     nodes.append('text')
-      .attr('x', 4)
+      .attr('class', 'node-size')
+      .attr('x', 6)
       .attr('y', 28)
       .text(d => {
         const w = d.x1 - d.x0;
         const h = d.y1 - d.y0;
-        if (w <= 80 || h <= 30) return '';
+        if (w < 60 || h < 36) return '';
         return formatBytes(d.value || 0);
-      })
-      .attr('font-size', 10)
-      .attr('fill', 'rgba(255,255,255,0.75)');
+      });
 
-    // Hover ve click
+    // Hover and click
     nodes
       .on('mousemove', function (event, d) {
-        tooltip.style.display = 'block';
-        tooltip.style.left = (event.clientX + 14) + 'px';
-        tooltip.style.top = (event.clientY - 28) + 'px';
+        const pct = d.value && stats.totalBytes ? (d.value / stats.totalBytes * 100).toFixed(1) : '0';
         tooltip.innerHTML =
-          '<strong>' + escapeHtml(d.data.name || '') + '</strong>' +
-          escapeHtml(formatBytes(d.value || 0)) + ' (' + escapeHtml(pct(d.value || 0, stats.totalBytes)) + ')';
+          '<div class="tooltip__name">' + escapeHtml(d.data.name || '') + '</div>' +
+          '<div class="tooltip__row"><span>Size</span><span>' + escapeHtml(formatBytes(d.value || 0)) + '</span></div>' +
+          '<div class="tooltip__row"><span>Share</span><span>' + escapeHtml(pct) + '%</span></div>' +
+          '<div class="tooltip__row"><span>Files</span><span>' + escapeHtml(String((d.data.files || []).length)) + '</span></div>' +
+          '<div class="tooltip__bar-track"><div class="tooltip__bar-fill" style="width:' + escapeHtml(pct) + '%"></div></div>';
+
+        tooltip.classList.add('visible');
+
+        tooltip.style.transform = 'translate(-9999px,-9999px)';
+        requestAnimationFrame(() => {
+          const pad = 14;
+          const tw = tooltip.offsetWidth;
+          const th = tooltip.offsetHeight;
+          let x = event.clientX + pad;
+          let y = event.clientY + pad;
+          if (x + tw > window.innerWidth - 8)  x = event.clientX - tw - pad;
+          if (y + th > window.innerHeight - 8) y = event.clientY - th - pad;
+          tooltip.style.transform = 'translate(' + x + 'px,' + y + 'px)';
+        });
       })
       .on('mouseleave', function () {
-        tooltip.style.display = 'none';
-      })
-      .on('click', function (_event, d) {
-        showSidebar(d.data);
+        tooltip.classList.remove('visible');
       });
+
+    let selectedNode = null;
+
+    nodes.on('click', function (_event, d) {
+      if (selectedNode) d3.select(selectedNode).classed('selected', false);
+      selectedNode = this;
+      d3.select(this).classed('selected', true);
+      showSidebar(d.data);
+    });
   }
 
   // --- Sidebar ---
   function showSidebar(pkg) {
-    const sidebar = document.getElementById('sidebar');
+    const sidebar     = document.getElementById('sidebar');
     const placeholder = document.querySelector('.sidebar-placeholder');
-    const content = document.querySelector('.sidebar-content');
-
+    const content     = document.querySelector('.sidebar-content');
     if (!sidebar || !placeholder || !content) return;
 
     sidebar.classList.remove('sidebar--empty');
     placeholder.style.display = 'none';
     content.style.display = 'block';
 
-    const sbName = document.getElementById('sb-name');
-    const sbSize = document.getElementById('sb-size');
-    const sbShare = document.getElementById('sb-share');
-    const sbFiles = document.getElementById('sb-files');
+    const sbBadge    = document.getElementById('sb-badge');
+    const sbName     = document.getElementById('sb-name');
+    const sbSizeEl   = document.getElementById('sb-size-val');
+    const sbShareVal = document.getElementById('sb-share-val');
+    const sbFilesVal = document.getElementById('sb-files-val');
     const sbFileList = document.getElementById('sb-file-list');
 
+    if (sbBadge) {
+      const n = pkg.name || '';
+      sbBadge.textContent = n === '<app>' ? 'app' : n.startsWith('@') ? 'scope' : 'npm';
+    }
     if (sbName) sbName.textContent = pkg.name || '';
-    if (sbSize) sbSize.textContent = formatBytes(pkg.size || 0);
-    if (sbShare) sbShare.textContent = pct(pkg.size || 0, stats.totalBytes);
-    if (sbFiles) sbFiles.textContent = String((pkg.files || []).length);
+
+    const sizeDetailed = formatBytesDetailed(pkg.size || 0);
+    if (sbSizeEl) {
+      while (sbSizeEl.firstChild) sbSizeEl.removeChild(sbSizeEl.firstChild);
+      sbSizeEl.appendChild(document.createTextNode(sizeDetailed.value));
+      const unitSpan = document.createElement('span');
+      unitSpan.className = 'unit';
+      unitSpan.textContent = sizeDetailed.unit;
+      sbSizeEl.appendChild(unitSpan);
+    }
+
+    const shareVal = stats.totalBytes ? (pkg.size / stats.totalBytes * 100).toFixed(1) : '0';
+    if (sbShareVal) {
+      while (sbShareVal.firstChild) sbShareVal.removeChild(sbShareVal.firstChild);
+      sbShareVal.appendChild(document.createTextNode(shareVal));
+      const unitSpan = document.createElement('span');
+      unitSpan.className = 'unit';
+      unitSpan.textContent = '%';
+      sbShareVal.appendChild(unitSpan);
+    }
+    if (sbFilesVal) sbFilesVal.textContent = String((pkg.files || []).length);
 
     if (sbFileList) {
       sbFileList.innerHTML = '';
-      const topFiles = [...(pkg.files || [])].sort((a, b) => b.size - a.size).slice(0, 15);
+      const topFiles = [...(pkg.files || [])].sort((a, b) => b.size - a.size).slice(0, 20);
+      const maxSize = topFiles[0] ? topFiles[0].size : 1;
       for (const f of topFiles) {
         const li = document.createElement('li');
+        li.className = 'file-bar';
+        li.style.setProperty('--bar', (f.size / maxSize * 100).toFixed(1) + '%');
+
         const parts = (f.path || '').replace(/\\/g, '/').split('/');
-        const displayName = parts.length >= 2
-          ? parts.slice(-2).join('/')
-          : parts[parts.length - 1] || f.path || '';
+        const displayName = parts.length >= 2 ? parts.slice(-2).join('/') : (parts[0] || f.path || '');
+
         const nameSpan = document.createElement('span');
+        nameSpan.className = 'file-bar__name';
         nameSpan.title = f.path || '';
         nameSpan.textContent = displayName;
+
         const sizeSpan = document.createElement('span');
+        sizeSpan.className = 'file-bar__size';
         sizeSpan.textContent = formatBytes(f.size || 0);
+
         li.appendChild(nameSpan);
         li.appendChild(sizeSpan);
         sbFileList.appendChild(li);
@@ -245,11 +301,17 @@
   // --- Init ---
   render('');
 
-  // --- Helper fonksiyonlar ---
+  // --- Helpers ---
   function formatBytes(bytes) {
     if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
     if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
     return bytes + ' B';
+  }
+
+  function formatBytesDetailed(bytes) {
+    if (bytes >= 1024 * 1024) return { value: (bytes / 1024 / 1024).toFixed(2), unit: 'MB' };
+    if (bytes >= 1024)        return { value: (bytes / 1024).toFixed(0),        unit: 'KB' };
+    return { value: String(bytes), unit: 'B' };
   }
 
   function pct(part, total) {
