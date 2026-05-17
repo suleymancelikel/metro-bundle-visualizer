@@ -97,6 +97,34 @@ describe('generateReport', () => {
     });
   });
 
+  it('generated HTML contains hero-stat element', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('class="hero-stat"');
+      expect(html).toContain('class="hero-stat__value"');
+    });
+  });
+
+  it('generated HTML contains platform badge', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('class="platform-badge"');
+    });
+  });
+
+  it('generated HTML contains search hint kbd', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('class="search-hint"');
+    });
+  });
+
   it('escapes </script> sequences in injected JSON (XSS prevention)', () => {
     const maliciousStats: BundleStats = {
       ...mockStats,

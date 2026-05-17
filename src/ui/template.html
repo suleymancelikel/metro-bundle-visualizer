@@ -10,25 +10,46 @@
   <div id="app">
     <header class="header">
       <div class="header-left">
-        <span class="logo">metro-bundle-visualizer</span>
-        <span class="total-size" id="total-size"></span>
+        <span class="logo">metro<span class="logo-dot">.</span>visualizer</span>
+        <span class="platform-badge" id="platform-badge"></span>
+      </div>
+      <div class="hero-stat">
+        <span class="hero-stat__value"><span id="hero-value"></span><span class="hero-stat__unit" id="hero-unit"></span></span>
+        <span class="hero-stat__sub" id="hero-sub"></span>
       </div>
       <div class="header-right">
-        <input type="search" id="search" placeholder="Search packages…" autocomplete="off">
+        <div class="search-wrap">
+          <kbd class="search-hint">/</kbd>
+          <input type="search" id="search" placeholder="Filter packages or paths…" autocomplete="off">
+        </div>
         <span class="meta" id="meta"></span>
       </div>
     </header>
     <main class="main">
       <div id="treemap-container"></div>
       <aside id="sidebar" class="sidebar sidebar--empty">
-        <div class="sidebar-placeholder">Click a package to see details</div>
+        <div class="sidebar-placeholder">← Select a package to inspect</div>
         <div class="sidebar-content" style="display:none">
-          <h2 id="sb-name"></h2>
-          <div class="sb-stat"><span>Size</span><strong id="sb-size"></strong></div>
-          <div class="sb-stat"><span>Share</span><strong id="sb-share"></strong></div>
-          <div class="sb-stat"><span>Files</span><strong id="sb-files"></strong></div>
-          <h3>Top files</h3>
-          <ul id="sb-file-list"></ul>
+          <div class="sb-header">
+            <span class="sb-pkg-badge" id="sb-badge">npm</span>
+            <h2 class="sb-name" id="sb-name"></h2>
+          </div>
+          <div class="sb-metrics">
+            <div class="sb-metric">
+              <span class="sb-metric__value" id="sb-size-val">—<span class="unit" id="sb-size-unit"></span></span>
+              <span class="sb-metric__label">size</span>
+            </div>
+            <div class="sb-metric">
+              <span class="sb-metric__value" id="sb-share-val">—<span class="unit">%</span></span>
+              <span class="sb-metric__label">of bundle</span>
+            </div>
+            <div class="sb-metric">
+              <span class="sb-metric__value" id="sb-files-val">—</span>
+              <span class="sb-metric__label">files</span>
+            </div>
+          </div>
+          <p class="sb-section-title">Top files by size</p>
+          <ul id="sb-file-list" class="file-bars"></ul>
         </div>
       </aside>
     </main>
