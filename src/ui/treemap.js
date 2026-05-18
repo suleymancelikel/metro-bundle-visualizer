@@ -25,7 +25,21 @@
     }
   }
 
-  const hierarchyData = { name: 'root', children: [...pkgMap.values()] };
+  const hierarchyData = {
+    name: 'root',
+    children: [...pkgMap.values()].map(pkg => ({
+      name: pkg.name,
+      size: pkg.size,
+      _isPackage: true,
+      files: pkg.files,
+      children: pkg.files.map(f => ({
+        name: f.path,
+        size: f.size,
+        _pkg: pkg.name,
+        files: [f],
+      })),
+    })),
+  };
 
   // Pre-compute lowercase path cache once at init (not per keystroke)
   const pkgFilePathCache = new Map();
@@ -34,7 +48,7 @@
   }
 
   const root = d3.hierarchy(hierarchyData)
-    .sum(d => d.size || 0)
+    .sum(d => (d.children ? 0 : d.size) || 0)
     .sort((a, b) => (b.value || 0) - (a.value || 0));
 
   // --- Semantic color by package category ---
