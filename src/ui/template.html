@@ -36,7 +36,26 @@
         <div id="treemap-container"></div>
       </div>
       <aside id="sidebar" class="sidebar sidebar--empty">
-        <div class="sidebar-placeholder">← Select a package to inspect</div>
+        <div class="sidebar-overview" id="sb-overview">
+  <p class="sb-section-title">Bundle overview</p>
+  <div class="sb-metrics" id="sb-overview-metrics">
+    <div class="sb-metric">
+      <span class="sb-metric__value"><span id="ov-size-val">—</span><span class="unit" id="ov-size-unit"></span></span>
+      <span class="sb-metric__label">total</span>
+    </div>
+    <div class="sb-metric">
+      <span class="sb-metric__value" id="ov-modules">—</span>
+      <span class="sb-metric__label">modules</span>
+    </div>
+    <div class="sb-metric">
+      <span class="sb-metric__value" id="ov-packages">—</span>
+      <span class="sb-metric__label">packages</span>
+    </div>
+  </div>
+  <p class="sb-section-title" style="margin-top:14px">Top packages</p>
+  <ul class="file-bars" id="sb-top-list"></ul>
+  <p class="sb-hint">Click a package to inspect its files</p>
+</div>
         <div class="sidebar-content" style="display:none">
           <div class="sb-header">
             <span class="sb-pkg-badge" id="sb-badge">npm</span>

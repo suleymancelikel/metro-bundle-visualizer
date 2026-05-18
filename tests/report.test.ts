@@ -143,6 +143,16 @@ describe('generateReport', () => {
     });
   });
 
+  it('generated HTML contains sidebar overview section', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('id="sb-overview"');
+      expect(html).toContain('id="sb-top-list"');
+    });
+  });
+
   it('escapes </script> sequences in injected JSON (XSS prevention)', () => {
     const maliciousStats: BundleStats = {
       ...mockStats,

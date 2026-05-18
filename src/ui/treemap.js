@@ -78,6 +78,48 @@
   if (metaEl)      metaEl.textContent     = 'platform: ' + (stats.platform || '—');
   if (footerEl)    footerEl.textContent   = 'Generated ' + new Date(stats.generatedAt).toLocaleString() + ' · Sizes are pre-minification (~20–40% larger than shipped binary)';
 
+  // Populate sidebar overview
+  (function () {
+    const ovSizeVal  = document.getElementById('ov-size-val');
+    const ovSizeUnit = document.getElementById('ov-size-unit');
+    const ovModules  = document.getElementById('ov-modules');
+    const ovPkgs     = document.getElementById('ov-packages');
+    const topList    = document.getElementById('sb-top-list');
+
+    const sizeD = formatBytesDetailed(stats.totalBytes);
+    if (ovSizeVal)  ovSizeVal.textContent  = sizeD.value;
+    if (ovSizeUnit) ovSizeUnit.textContent = sizeD.unit;
+    if (ovModules)  ovModules.textContent  = String(stats.modules.length);
+    if (ovPkgs)     ovPkgs.textContent     = String(pkgMap.size);
+
+    if (topList) {
+      const sorted = [...pkgMap.values()].sort((a, b) => b.size - a.size).slice(0, 10);
+      const maxSz = sorted[0] ? sorted[0].size : 1;
+      for (const pkg of sorted) {
+        const li = document.createElement('li');
+        li.className = 'file-bar';
+        li.style.setProperty('--bar', (pkg.size / maxSz * 100).toFixed(1) + '%');
+        li.style.cursor = 'pointer';
+
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'file-bar__name';
+        nameSpan.textContent = pkg.name;
+
+        const sizeSpan = document.createElement('span');
+        sizeSpan.className = 'file-bar__size';
+        sizeSpan.textContent = formatBytes(pkg.size);
+
+        li.appendChild(nameSpan);
+        li.appendChild(sizeSpan);
+        li.addEventListener('click', () => {
+          showSidebar(pkg);
+          enterFocusMode(pkg.name);
+        });
+        topList.appendChild(li);
+      }
+    }
+  })();
+
   // --- Tooltip ---
   const tooltip = document.createElement('div');
   tooltip.className = 'tooltip';
@@ -280,13 +322,16 @@
 
   // --- Sidebar ---
   function showSidebar(pkg) {
+    const overview = document.getElementById('sb-overview');
+    if (overview) overview.style.display = 'none';
+
     const sidebar     = document.getElementById('sidebar');
     const placeholder = document.querySelector('.sidebar-placeholder');
     const content     = document.querySelector('.sidebar-content');
-    if (!sidebar || !placeholder || !content) return;
+    if (!sidebar || !content) return;
 
     sidebar.classList.remove('sidebar--empty');
-    placeholder.style.display = 'none';
+    if (placeholder) placeholder.style.display = 'none';
     content.style.display = 'block';
 
     const sbBadge    = document.getElementById('sb-badge');
