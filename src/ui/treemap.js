@@ -307,6 +307,7 @@
     if (breadcrumb)    breadcrumb.style.display = 'flex';
     if (breadcrumbPkg) breadcrumbPkg.textContent = pkgName;
     render(currentFilter);
+    encodeState();
   }
 
   function exitFocusMode() {
@@ -315,6 +316,7 @@
     const breadcrumb = document.getElementById('breadcrumb');
     if (breadcrumb) breadcrumb.style.display = 'none';
     render(currentFilter);
+    encodeState();
   }
 
   const breadcrumbBack = document.getElementById('breadcrumb-back');
@@ -406,7 +408,7 @@
       clearTimeout(searchTimer);
       const value = this.value;
       if (searchClearEl) searchClearEl.style.display = value ? 'block' : 'none';
-      searchTimer = setTimeout(() => render(value), 150);
+      searchTimer = setTimeout(() => { render(value); encodeState(); }, 150);
     });
   }
 
@@ -453,8 +455,36 @@
     ro.observe(container);
   }
 
+  // --- Permalink ---
+  function encodeState() {
+    const parts = [];
+    if (currentFilter) parts.push('q=' + encodeURIComponent(currentFilter));
+    if (focusedPkg)    parts.push('pkg=' + encodeURIComponent(focusedPkg));
+    history.replaceState(null, '', parts.length ? '#' + parts.join('&') : location.pathname + location.search);
+  }
+
+  function restoreState() {
+    if (!location.hash) return;
+    const params = new URLSearchParams(location.hash.slice(1));
+    const q   = params.get('q');
+    const pkg = params.get('pkg');
+    if (q && searchEl) {
+      searchEl.value = q;
+      currentFilter = q.toLowerCase();
+      if (searchClearEl) searchClearEl.style.display = 'block';
+    }
+    if (pkg) {
+      focusedPkg = pkg;
+      const breadcrumb    = document.getElementById('breadcrumb');
+      const breadcrumbPkg = document.getElementById('breadcrumb-pkg');
+      if (breadcrumb)    breadcrumb.style.display = 'flex';
+      if (breadcrumbPkg) breadcrumbPkg.textContent = pkg;
+    }
+  }
+
   // --- Init ---
-  render('');
+  restoreState();
+  render(currentFilter);
 
   // --- Helpers ---
   function formatBytes(bytes) {
