@@ -129,7 +129,7 @@
       name: 'root',
       children: filteredChildren.map(c => c.data),
     })
-      .sum(d => d.size || 0)
+      .sum(d => (d.children ? 0 : d.size) || 0)
       .sort((a, b) => (b.value || 0) - (a.value || 0));
 
     d3.treemap()
