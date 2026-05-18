@@ -76,6 +76,16 @@ Report saved to: ./bundle-report.html
 Opened in browser.
 ```
 
+## Report Features
+
+The generated `bundle-report.html` is a self-contained interactive report:
+
+- **Hero stat** — total bundle size displayed prominently in the header
+- **Semantic treemap** — packages colored by category: your app code (orange), React Native internals (slate), Babel transforms (purple), scoped packages (teal), other npm (blue-grey)
+- **Click to inspect** — select any package to see its size, percentage share, file count, and top files with proportional size bars
+- **Search** — filter packages by name or file path; press `/` to focus, `Esc` to clear
+- **Accurate sizes** — post-transform, pre-minification byte counts (expect ~20–40% larger than the shipped binary)
+
 ## How It Works
 
 Instead of post-processing source maps (broken on Metro 0.83+), this tool injects a custom serializer into Metro's bundling pipeline. Each module's `output[0].data.code` — the exact bytes Metro writes to the bundle — is captured and attributed to its package. The result is a self-contained HTML file with a D3.js treemap.

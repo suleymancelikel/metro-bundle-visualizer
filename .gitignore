@@ -1,0 +1,22 @@
+node_modules/
+dist/
+*.js.map
+bundle-report.html
+coverage/
+.env
+*.tgz
+
+# Claude Code local settings (contains machine-specific absolute paths)
+.claude/
+.agents/
+
+
+skills-lock.json
+
+# Internal AI planning/spec docs generated during development
+docs/*
+
+# Temp files left behind if CLI crashes before cleanup
+mbv-metro-config-*.js
+mbv-stats-*.json
+CLAUDE.md
