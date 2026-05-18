@@ -315,6 +315,10 @@
     selectedNode = null;
     const breadcrumb = document.getElementById('breadcrumb');
     if (breadcrumb) breadcrumb.style.display = 'none';
+    const overview = document.getElementById('sb-overview');
+    const sidebarContent = document.querySelector('.sidebar-content');
+    if (overview) overview.style.display = '';
+    if (sidebarContent) sidebarContent.style.display = 'none';
     render(currentFilter);
     encodeState();
   }
