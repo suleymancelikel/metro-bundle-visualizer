@@ -107,6 +107,12 @@ body {
   transition: color 100ms;
 }
 .search-clear:hover { color: var(--text-1); }
+.search-count {
+  position: absolute; right: 28px;
+  font-size: 10px; color: var(--text-3);
+  font-family: var(--mono); white-space: nowrap;
+  pointer-events: none;
+}
 
 .main { display: flex; flex: 1; overflow: hidden; }
 .treemap-wrap { flex: 1; display: flex; flex-direction: column; overflow: hidden; }

@@ -246,6 +246,16 @@
         const pkg = pkgMap.get(pkgName) || { name: pkgName, size: d.value, files: d.data.files || [] };
         showSidebar(pkg);
       });
+
+    const countEl = document.getElementById('search-count');
+    if (countEl) {
+      if (currentFilter && !focusedPkg) {
+        const total = root.children ? root.children.length : 0;
+        countEl.textContent = dataChildren.length + ' / ' + total;
+      } else {
+        countEl.textContent = '';
+      }
+    }
   }
 
   function enterFocusMode(pkgName) {
