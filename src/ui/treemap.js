@@ -98,6 +98,7 @@
   let currentFilter = '';
   let selectedNode = null;
   let tooltipRafId = null;
+  let focusedPkg = null;
 
   // --- Render function ---
   function render(filterText) {
@@ -105,38 +106,68 @@
     g.selectAll('*').remove();
     svg.select('.treemap-empty-state').remove();
 
-    const filteredChildren = root.children
-      ? root.children.filter(c => {
-          if (!currentFilter) return true;
-          if ((c.data.name || '').toLowerCase().includes(currentFilter)) return true;
-          const paths = pkgFilePathCache.get(c.data.name) || [];
-          return paths.some(p => p.includes(currentFilter));
-        })
-      : [];
+    let dataChildren;
+    if (focusedPkg !== null) {
+      const pkg = pkgMap.get(focusedPkg);
+      dataChildren = pkg ? pkg.files.map(f => ({ name: f.path, size: f.size, _pkg: pkg.name, files: [f] })) : [];
+    } else {
+      dataChildren = root.children
+        ? root.children.filter(c => {
+            if (!currentFilter) return true;
+            if ((c.data.name || '').toLowerCase().includes(currentFilter)) return true;
+            const paths = pkgFilePathCache.get(c.data.name) || [];
+            return paths.some(p => p.includes(currentFilter));
+          }).map(c => c.data)
+        : [];
+    }
 
-    if (filteredChildren.length === 0) {
+    if (dataChildren.length === 0) {
       svg.append('text')
         .attr('class', 'treemap-empty-state')
-        .attr('x', '50%')
-        .attr('y', '50%')
-        .attr('text-anchor', 'middle')
-        .attr('dominant-baseline', 'middle')
+        .attr('x', '50%').attr('y', '50%')
+        .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
         .text(currentFilter ? 'No packages match "' + currentFilter + '"' : 'No data');
       return;
     }
 
-    const filteredRoot = d3.hierarchy({
-      name: 'root',
-      children: filteredChildren.map(c => c.data),
-    })
+    const filteredRoot = d3.hierarchy({ name: 'root', children: dataChildren })
       .sum(d => (d.children ? 0 : d.size) || 0)
       .sort((a, b) => (b.value || 0) - (a.value || 0));
+
+    const PKG_HEADER_H = focusedPkg ? 0 : 18;
 
     d3.treemap()
       .size([width, height])
       .paddingOuter(3)
-      .paddingInner(2)
+      .paddingTop(d => d.depth === 1 && !focusedPkg ? PKG_HEADER_H : 0)
+      .paddingInner(1)
       .round(true)(filteredRoot);
+
+    if (!focusedPkg) {
+      const pkgGroups = g.selectAll('.pkg-strip')
+        .data(filteredRoot.children || [])
+        .join('g')
+        .attr('class', 'pkg-strip')
+        .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+      pkgGroups.append('rect')
+        .attr('width', d => Math.max(0, d.x1 - d.x0))
+        .attr('height', PKG_HEADER_H);
+
+      pkgGroups.append('text')
+        .attr('x', 4).attr('y', PKG_HEADER_H - 4)
+        .text(d => {
+          const w = d.x1 - d.x0 - 8;
+          const name = d.data.name || '';
+          const maxChars = Math.floor(w / 6.5);
+          if (maxChars < 3) return '';
+          return name.length <= maxChars ? name : name.slice(0, maxChars - 1) + '…';
+        });
+
+      pkgGroups.on('click', function (_e, d) {
+        enterFocusMode(d.data.name);
+      });
+    }
 
     const nodes = g.selectAll('.node')
       .data(filteredRoot.leaves())
@@ -147,28 +178,26 @@
     nodes.append('rect')
       .attr('width', d => Math.max(0, d.x1 - d.x0))
       .attr('height', d => Math.max(0, d.y1 - d.y0))
-      .attr('fill', d => categoryColor(d.data.name))
+      .attr('fill', d => categoryColor(d.data._pkg || d.data.name))
       .attr('rx', 2);
 
-    // Package name label (top-left)
     nodes.append('text')
       .attr('class', 'node-label')
-      .attr('x', 6)
-      .attr('y', 15)
+      .attr('x', 6).attr('y', 15)
       .text(d => {
         const w = d.x1 - d.x0 - 12;
-        const name = d.data.name || '';
+        const name = focusedPkg
+          ? ((d.data.name || '').split('/').slice(-2).join('/'))
+          : (d.data.name || '');
         if (w < 30) return '';
         const maxChars = Math.floor(w / 6.5);
         if (maxChars < 4) return '';
         return name.length <= maxChars ? name : name.slice(0, maxChars - 1) + '…';
       });
 
-    // Size label (second line, only for larger cells)
     nodes.append('text')
       .attr('class', 'node-size')
-      .attr('x', 6)
-      .attr('y', 28)
+      .attr('x', 6).attr('y', 28)
       .text(d => {
         const w = d.x1 - d.x0;
         const h = d.y1 - d.y0;
@@ -176,44 +205,67 @@
         return formatBytes(d.value || 0);
       });
 
-    // Hover and click
+    if (currentFilter && !focusedPkg) {
+      nodes.classed('dimmed', d => {
+        const pkgName = d.data._pkg || d.data.name || '';
+        if (pkgName.toLowerCase().includes(currentFilter)) return false;
+        const paths = pkgFilePathCache.get(pkgName) || [];
+        return !paths.some(p => p.includes(currentFilter));
+      });
+    }
+
     nodes
       .on('mousemove', function (event, d) {
+        const pkgName = d.data._pkg || d.data.name || '';
         const pct = d.value && stats.totalBytes ? (d.value / stats.totalBytes * 100).toFixed(1) : '0';
         tooltip.innerHTML =
-          '<div class="tooltip__name">' + escapeHtml(d.data.name || '') + '</div>' +
+          '<div class="tooltip__name">' + escapeHtml(focusedPkg ? (d.data.name || '').split('/').slice(-1)[0] : pkgName) + '</div>' +
           '<div class="tooltip__row"><span>Size</span><span>' + escapeHtml(formatBytes(d.value || 0)) + '</span></div>' +
           '<div class="tooltip__row"><span>Share</span><span>' + escapeHtml(pct) + '%</span></div>' +
-          '<div class="tooltip__row"><span>Files</span><span>' + escapeHtml(String((d.data.files || []).length)) + '</span></div>' +
+          (focusedPkg ? '' : '<div class="tooltip__row"><span>Files</span><span>' + escapeHtml(String((pkgMap.get(pkgName) || { files: [] }).files.length)) + '</span></div>') +
           '<div class="tooltip__bar-track"><div class="tooltip__bar-fill" style="width:' + escapeHtml(pct) + '%"></div></div>';
 
         tooltip.classList.add('visible');
-
         if (tooltipRafId) cancelAnimationFrame(tooltipRafId);
         tooltip.style.transform = 'translate(-9999px,-9999px)';
         tooltipRafId = requestAnimationFrame(() => {
           tooltipRafId = null;
-          const pad = 14;
-          const tw = tooltip.offsetWidth;
-          const th = tooltip.offsetHeight;
-          let x = event.clientX + pad;
-          let y = event.clientY + pad;
+          const pad = 14, tw = tooltip.offsetWidth, th = tooltip.offsetHeight;
+          let x = event.clientX + pad, y = event.clientY + pad;
           if (x + tw > window.innerWidth - 8)  x = event.clientX - tw - pad;
           if (y + th > window.innerHeight - 8) y = event.clientY - th - pad;
           tooltip.style.transform = 'translate(' + x + 'px,' + y + 'px)';
         });
       })
-      .on('mouseleave', function () {
-        tooltip.classList.remove('visible');
+      .on('mouseleave', () => tooltip.classList.remove('visible'))
+      .on('click', function (_event, d) {
+        if (selectedNode) d3.select(selectedNode).classed('selected', false);
+        selectedNode = this;
+        d3.select(this).classed('selected', true);
+        const pkgName = d.data._pkg || d.data.name;
+        const pkg = pkgMap.get(pkgName) || { name: pkgName, size: d.value, files: d.data.files || [] };
+        showSidebar(pkg);
       });
-
-    nodes.on('click', function (_event, d) {
-      if (selectedNode) d3.select(selectedNode).classed('selected', false);
-      selectedNode = this;
-      d3.select(this).classed('selected', true);
-      showSidebar(d.data);
-    });
   }
+
+  function enterFocusMode(pkgName) {
+    focusedPkg = pkgName;
+    const breadcrumb    = document.getElementById('breadcrumb');
+    const breadcrumbPkg = document.getElementById('breadcrumb-pkg');
+    if (breadcrumb)    breadcrumb.style.display = 'flex';
+    if (breadcrumbPkg) breadcrumbPkg.textContent = pkgName;
+    render(currentFilter);
+  }
+
+  function exitFocusMode() {
+    focusedPkg = null;
+    const breadcrumb = document.getElementById('breadcrumb');
+    if (breadcrumb) breadcrumb.style.display = 'none';
+    render(currentFilter);
+  }
+
+  const breadcrumbBack = document.getElementById('breadcrumb-back');
+  if (breadcrumbBack) breadcrumbBack.addEventListener('click', exitFocusMode);
 
   // --- Sidebar ---
   function showSidebar(pkg) {
@@ -318,7 +370,9 @@
       if (searchEl) searchEl.focus();
     }
     if (e.key === 'Escape') {
-      if (document.activeElement === searchEl) {
+      if (focusedPkg !== null) {
+        exitFocusMode();
+      } else if (document.activeElement === searchEl) {
         searchEl.blur();
         if (searchEl.value) {
           searchEl.value = '';

@@ -27,7 +27,13 @@
       </div>
     </header>
     <main class="main">
-      <div id="treemap-container"></div>
+      <div class="treemap-wrap">
+        <div class="breadcrumb" id="breadcrumb" style="display:none">
+          <button class="breadcrumb__back" id="breadcrumb-back">← All packages</button>
+          <span class="breadcrumb__pkg" id="breadcrumb-pkg"></span>
+        </div>
+        <div id="treemap-container"></div>
+      </div>
       <aside id="sidebar" class="sidebar sidebar--empty">
         <div class="sidebar-placeholder">← Select a package to inspect</div>
         <div class="sidebar-content" style="display:none">
