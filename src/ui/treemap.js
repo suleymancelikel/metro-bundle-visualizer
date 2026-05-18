@@ -259,6 +259,7 @@
 
   function exitFocusMode() {
     focusedPkg = null;
+    selectedNode = null;
     const breadcrumb = document.getElementById('breadcrumb');
     if (breadcrumb) breadcrumb.style.display = 'none';
     render(currentFilter);

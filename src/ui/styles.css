@@ -17,6 +17,8 @@
   --danger: #f25555;
   --success: #4ade80;
   --mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+  --pkg-strip-bg: rgba(0,0,0,0.35);
+  --pkg-strip-bg-hover: rgba(0,0,0,0.55);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -129,7 +131,7 @@ body {
 .breadcrumb__pkg { font-size: 12px; color: var(--text-2); font-family: var(--mono); }
 
 .pkg-strip rect {
-  fill: rgba(0,0,0,0.35);
+  fill: var(--pkg-strip-bg);
 }
 .pkg-strip text {
   fill: var(--text-1);
@@ -137,7 +139,7 @@ body {
   font-weight: 600;
   pointer-events: none;
 }
-.pkg-strip:hover rect { fill: rgba(0,0,0,0.55); cursor: pointer; }
+.pkg-strip:hover rect { fill: var(--pkg-strip-bg-hover); cursor: pointer; }
 
 .node.dimmed rect { opacity: 0.15; }
 .node.dimmed text { opacity: 0.15; }
