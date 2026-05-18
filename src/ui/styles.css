@@ -165,7 +165,7 @@ body {
   text-align: center;
   margin-top: 40px;
 }
-.sb-hint { font-size: 11px; color: var(--text-3); margin-top: 12px; text-align: center; }
+.sb-hint { font-size: 11px; color: var(--text-3); font-family: var(--mono); margin-top: 12px; text-align: center; }
 .sidebar-overview .sb-metrics { margin-bottom: 0; }
 .sb-header { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 14px; }
 .sb-pkg-badge {
