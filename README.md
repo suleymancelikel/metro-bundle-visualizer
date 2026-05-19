@@ -41,6 +41,8 @@ Options:
   -o, --out <path>               Output HTML path (default: "./bundle-report.html")
   --no-open                      Don't open browser automatically
   --reset-cache                  Reset Metro cache before bundling
+  --budget <bytes>               Warn if bundle size exceeds this threshold
+  --compare <path>               Show size deltas against a previous report
   -V, --version                  Print version
   -h, --help                     Show help
 ```
@@ -58,10 +60,28 @@ npx metro-bundle-visualizer --platform android
 npx metro-bundle-visualizer --no-open --out ./reports/bundle.html
 ```
 
+### Budget warnings
+
+```bash
+# Warn if bundle exceeds 3 MB
+npx metro-bundle-visualizer --budget 3145728
+```
+
+A warning banner appears at the top of the report showing how much the budget was exceeded.
+
+### Comparison mode
+
+```bash
+# Compare against a previous report to see size deltas
+npx metro-bundle-visualizer --compare ./previous-bundle-report.html
+```
+
+Each package tile shows a `+X KB` / `-X KB` badge. The sidebar includes a "vs prev" metric. Designed for CI: save your main-branch report as an artifact, then compare on each PR.
+
 ### Expected output
 
 ```
-metro-bundle-visualizer v0.1.0
+metro-bundle-visualizer v0.2.0
 
 Project:  /your/rn/project
 Entry:    index.js
@@ -85,6 +105,8 @@ The generated `bundle-report.html` is a self-contained interactive report:
 - **Click to inspect** — select any package to see its size, percentage share, file count, and top files with proportional size bars
 - **Search** — filter packages by name or file path; press `/` to focus, `Esc` to clear
 - **Accurate sizes** — post-transform, pre-minification byte counts (expect ~20–40% larger than the shipped binary)
+- **Budget warnings** — pass `--budget <bytes>` to show a warning banner if the bundle exceeds the threshold
+- **Comparison mode** — pass `--compare <prev-report.html>` to overlay `+/−` size deltas on every package; sidebar shows "vs prev" metric
 
 ## How It Works
 
