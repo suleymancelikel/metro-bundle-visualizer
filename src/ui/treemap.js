@@ -14,6 +14,26 @@
     return { value: String(bytes), unit: 'B' };
   }
 
+  const KNOWN_HEAVY = {
+    'moment':                  { alt: 'date-fns or dayjs', reason: 'Includes all locales by default (~300 KB parsed).' },
+    'lodash':                  { alt: 'lodash-es with tree-shaking or per-function imports', reason: 'Full lodash is ~72 KB; most apps use <10 functions.' },
+    'lodash-es':               { alt: 'per-function imports (lodash-es/debounce)', reason: 'Without tree-shaking in Metro, the full library is bundled.' },
+    'react-native-vector-icons': { alt: 'react-native-svg icons or @expo/vector-icons subset', reason: 'Font files can add 1-2 MB to the bundle assets.' },
+    'react-native-paper':      { alt: 'import only used components', reason: 'Full library is large; use named imports to enable tree-shaking.' },
+    'firebase':                { alt: 'import only the modules you use (firebase/firestore)', reason: 'Importing the full firebase package includes unused SDKs.' },
+    '@firebase/app':           { alt: 'use modular firebase imports', reason: 'Legacy compat layer is significantly larger than modular API.' },
+    'axios':                   { alt: 'fetch API (built-in)', reason: 'React Native includes fetch. Axios adds ~14 KB for XHR shims.' },
+    'underscore':              { alt: 'lodash or native ES methods', reason: 'Fully replaced by lodash and ES6+ methods.' },
+    'uuid':                    { alt: 'crypto.randomUUID() or nanoid', reason: 'uuid is large and includes polyfills; nanoid is ~130 bytes.' },
+    'nanoid':                  { alt: '', reason: 'Already a good small choice - make sure you only import the core.' },
+    'classnames':              { alt: 'clsx', reason: 'clsx is half the size with the same API.' },
+    '@sentry/react-native':    { alt: '', reason: 'Large but necessary. Ensure source maps are configured so only the core is included.' },
+    'react-redux':             { alt: '', reason: 'Healthy. Ensure you are not accidentally bundling the dev tools build.' },
+    'immer':                   { alt: '', reason: 'Healthy. Make sure you are using the ES module build.' },
+    'rxjs':                    { alt: 'use only the operators you need', reason: 'Full RxJS is ~200 KB; tree-shaking requires explicit operator imports.' },
+    '@react-navigation/stack': { alt: '@react-navigation/native-stack', reason: 'native-stack uses the native iOS/Android navigator and is smaller.' },
+  };
+
   const stats = window.__BUNDLE_STATS__;
   if (!stats) return;
 
@@ -379,6 +399,27 @@
       sbBadge.textContent = n === '<app>' ? 'app' : n.startsWith('@') ? 'scope' : 'npm';
     }
     if (sbName) sbName.textContent = pkg.name || '';
+
+    const warningEl      = document.getElementById('sb-warning');
+    const warningTitle   = document.getElementById('sb-warning-title');
+    const warningReason  = document.getElementById('sb-warning-reason');
+    const warningAlt     = document.getElementById('sb-warning-alt');
+
+    const knownKey = Object.keys(KNOWN_HEAVY).find(k =>
+      pkg.name === k || pkg.name.startsWith(k + '/')
+    );
+    const knownEntry = knownKey ? KNOWN_HEAVY[knownKey] : null;
+
+    if (warningEl) {
+      if (knownEntry) {
+        warningEl.style.display = 'flex';
+        if (warningTitle)  warningTitle.textContent  = 'Consider replacing ' + (knownKey || pkg.name);
+        if (warningReason) warningReason.textContent = knownEntry.reason;
+        if (warningAlt)    warningAlt.textContent    = knownEntry.alt ? 'Alternative: ' + knownEntry.alt : '';
+      } else {
+        warningEl.style.display = 'none';
+      }
+    }
 
     const sizeDetailed = formatBytesDetailed(pkg.size || 0);
     if (sbSizeEl) {
