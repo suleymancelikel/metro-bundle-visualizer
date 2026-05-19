@@ -51,6 +51,20 @@
     }
   }
 
+  const prevStats = window.__PREV_STATS__ || null;
+
+  const prevPkgMap = new Map();
+  if (prevStats && prevStats.modules) {
+    for (const mod of prevStats.modules) {
+      const existing = prevPkgMap.get(mod.package);
+      if (existing) {
+        existing.size += mod.size;
+      } else {
+        prevPkgMap.set(mod.package, { size: mod.size });
+      }
+    }
+  }
+
   // --- XSS-safe escape helper ---
   function escapeHtml(str) {
     return String(str)
@@ -294,6 +308,31 @@
         return formatBytes(d.value || 0);
       });
 
+    if (prevStats) {
+      nodes.append('text')
+        .attr('class', function(d) {
+          const pkgName = d.data._pkg || d.data.name;
+          const prevPkg = prevPkgMap.get(pkgName);
+          const delta = prevPkg !== undefined ? (d.value || 0) - prevPkg.size : null;
+          if (delta === null) return 'node-delta node-delta--same';
+          return delta > 0 ? 'node-delta node-delta--up' : delta < 0 ? 'node-delta node-delta--down' : 'node-delta node-delta--same';
+        })
+        .attr('x', function(d) { return Math.max(0, d.x1 - d.x0) - 6; })
+        .attr('y', 14)
+        .attr('text-anchor', 'end')
+        .text(function(d) {
+          const w = d.x1 - d.x0;
+          const h = d.y1 - d.y0;
+          if (w < 50 || h < 20) return '';
+          const pkgName = d.data._pkg || d.data.name;
+          const prevPkg = prevPkgMap.get(pkgName);
+          if (prevPkg === undefined) return 'new';
+          const delta = (d.value || 0) - prevPkg.size;
+          if (Math.abs(delta) < 512) return '~';
+          return (delta > 0 ? '+' : '') + formatBytes(delta);
+        });
+    }
+
     if (currentFilter && !focusedPkg) {
       nodes.classed('dimmed', d => {
         const pkgName = d.data._pkg || d.data.name || '';
@@ -441,6 +480,24 @@
       sbShareVal.appendChild(unitSpan);
     }
     if (sbFilesVal) sbFilesVal.textContent = String((pkg.files || []).length);
+
+    const sbDeltaWrap = document.getElementById('sb-delta-wrap');
+    if (prevStats && sbDeltaWrap) {
+      const prevPkg = prevPkgMap.get(pkg.name);
+      if (prevPkg !== undefined) {
+        sbDeltaWrap.style.display = '';
+        const deltaEl = document.getElementById('sb-delta-val');
+        if (deltaEl) {
+          const delta = (pkg.size || 0) - prevPkg.size;
+          deltaEl.textContent = (delta > 0 ? '+' : '') + formatBytes(delta);
+          deltaEl.className = 'sb-metric__value ' + (delta > 0 ? 'delta-up' : delta < 0 ? 'delta-down' : 'delta-same');
+        }
+      } else {
+        sbDeltaWrap.style.display = 'none';
+      }
+    } else if (sbDeltaWrap) {
+      sbDeltaWrap.style.display = 'none';
+    }
 
     if (sbFileList) {
       sbFileList.innerHTML = '';
