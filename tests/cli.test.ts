@@ -1,6 +1,6 @@
 import * as path from 'path';
 import type { BundleStats } from '../src/serializer';
-import { resolveProjectRoot, resolveJsonPath, buildJsonOutput, buildStepSummary } from '../src/cli';
+import { resolveProjectRoot, resolveJsonPath, buildJsonOutput, buildStepSummary, parseBudget } from '../src/cli';
 
 describe('resolveProjectRoot', () => {
   it('returns process.cwd() when flag is undefined', () => {
@@ -135,5 +135,33 @@ describe('buildStepSummary', () => {
     const reactIdx = result.indexOf('| react |');
     expect(rnIdx).toBeLessThan(appIdx);
     expect(appIdx).toBeLessThan(reactIdx);
+  });
+});
+
+describe('parseBudget', () => {
+  it('parses raw byte numbers', () => {
+    expect(parseBudget('1048576')).toBe(1048576);
+  });
+
+  it('parses kb suffix', () => {
+    expect(parseBudget('500kb')).toBe(500 * 1024);
+  });
+
+  it('parses mb suffix', () => {
+    expect(parseBudget('1mb')).toBe(1024 * 1024);
+  });
+
+  it('parses gb suffix', () => {
+    expect(parseBudget('2gb')).toBe(2 * 1024 * 1024 * 1024);
+  });
+
+  it('is case-insensitive and tolerates whitespace', () => {
+    expect(parseBudget(' 1.5 MB ')).toBe(Math.round(1.5 * 1024 * 1024));
+  });
+
+  it('throws on invalid input', () => {
+    expect(() => parseBudget('abc')).toThrow();
+    expect(() => parseBudget('1tb')).toThrow();
+    expect(() => parseBudget('')).toThrow();
   });
 });

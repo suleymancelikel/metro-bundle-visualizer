@@ -163,6 +163,38 @@ describe('generateReport', () => {
     });
   });
 
+  it('injects budget before treemap script so it is defined when read', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath, { budget: 1024 });
+      const html = fs.readFileSync(outputPath, 'utf8');
+      const budgetIdx = html.indexOf('window.__BUNDLE_BUDGET__ =');
+      const treemapReadIdx = html.indexOf('window.__BUNDLE_BUDGET__ != null');
+      expect(budgetIdx).toBeGreaterThan(-1);
+      expect(treemapReadIdx).toBeGreaterThan(-1);
+      expect(budgetIdx).toBeLessThan(treemapReadIdx);
+    });
+  });
+
+  it('injects previous stats before treemap script', () => {
+    const prevStats: BundleStats = {
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      platform: 'ios',
+      totalBytes: 5000000,
+      modules: [{ path: 'index.js', size: 5000000, package: '<app>' }],
+    };
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath, { previousStats: prevStats });
+      const html = fs.readFileSync(outputPath, 'utf8');
+      const prevIdx = html.indexOf('window.__PREV_STATS__ =');
+      const treemapReadIdx = html.indexOf('__PREV_STATS__ ||');
+      expect(prevIdx).toBeGreaterThan(-1);
+      expect(treemapReadIdx).toBeGreaterThan(-1);
+      expect(prevIdx).toBeLessThan(treemapReadIdx);
+    });
+  });
+
   it('does not inject budget assignment when not provided', () => {
     withTmpDir(dir => {
       const outputPath = path.join(dir, 'report.html');

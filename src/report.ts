@@ -22,32 +22,27 @@ export function generateReport(stats: BundleStats, outputPath: string, options: 
   const d3 = readAsset('d3.min.js');
   const treemap = readAsset('treemap.js');
 
-  const html = template
-    .replace('/* STATS_PLACEHOLDER */', () => safeJson)
-    .replace('/* STYLES_PLACEHOLDER */', () => styles)
-    .replace('/* D3_PLACEHOLDER */', () => d3)
-    .replace('/* TREEMAP_PLACEHOLDER */', () => treemap)
-    .replace('/* TITLE_PLACEHOLDER */', `Bundle Report — ${stats.projectName ?? 'app'} (${stats.platform})`);
-
-  let finalHtml = html;
-
+  let preTreemapScripts = '';
   if (options.budget !== undefined) {
-    finalHtml = finalHtml.replace(
-      '</body>',
-      `<script>window.__BUNDLE_BUDGET__ = ${options.budget};</script>\n</body>`
-    );
+    preTreemapScripts += `<script>window.__BUNDLE_BUDGET__ = ${options.budget};</script>\n  `;
   }
-
   if (options.previousStats) {
     const prevJson = JSON.stringify(options.previousStats)
       .replace(/</g, '\\u003c')
       .replace(/>/g, '\\u003e')
       .replace(/&/g, '\\u0026');
-    finalHtml = finalHtml.replace(
-      '</body>',
-      `<script>window.__PREV_STATS__ = ${prevJson};</script>\n</body>`
-    );
+    preTreemapScripts += `<script>window.__PREV_STATS__ = ${prevJson};</script>\n  `;
   }
+
+  const finalHtml = template
+    .replace('/* STATS_PLACEHOLDER */', () => safeJson)
+    .replace('/* STYLES_PLACEHOLDER */', () => styles)
+    .replace('/* D3_PLACEHOLDER */', () => d3)
+    .replace(
+      '<script>/* TREEMAP_PLACEHOLDER */</script>',
+      () => preTreemapScripts + '<script>' + treemap + '</script>'
+    )
+    .replace('/* TITLE_PLACEHOLDER */', `Bundle Report — ${stats.projectName ?? 'app'} (${stats.platform})`);
 
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(outputPath, finalHtml, 'utf8');

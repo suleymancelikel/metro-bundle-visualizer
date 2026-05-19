@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 'use strict';
 
-import { Command } from 'commander';
+import { Command, InvalidArgumentError } from 'commander';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -13,6 +13,19 @@ import type { BundleStats } from './serializer';
 const pkg = JSON.parse(
   fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8')
 ) as { version: string; name: string };
+
+export function parseBudget(raw: string): number {
+  const m = raw.trim().toLowerCase().match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|gb)?$/);
+  if (!m) {
+    throw new InvalidArgumentError(
+      `Invalid --budget value "${raw}". Use a number with optional suffix: b, kb, mb, gb (e.g. 1mb, 500kb, 1048576).`
+    );
+  }
+  const num = parseFloat(m[1]);
+  const unit = m[2] ?? 'b';
+  const mult: Record<string, number> = { b: 1, kb: 1024, mb: 1024 * 1024, gb: 1024 * 1024 * 1024 };
+  return Math.round(num * mult[unit]);
+}
 
 const program = new Command();
 
@@ -29,7 +42,7 @@ program
   .option('--project-root <path>', 'Root directory of the React Native project (default: cwd)')
   .option('--json [path]', 'Write bundle stats JSON (default: ./bundle-stats.json)')
   .option('--quiet', 'Suppress progress output (errors always shown)', false)
-  .option('--budget <bytes>', 'Warn if total bundle size exceeds this many bytes', (v) => parseInt(v, 10))
+  .option('--budget <size>', 'Warn if total bundle size exceeds this size (e.g. 1mb, 500kb, 1048576)', parseBudget)
   .option('--compare <path>', 'Path to a previous bundle-report.html to show size deltas')
   .parse(process.argv);
 
