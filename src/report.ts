@@ -53,6 +53,16 @@ export function generateReport(stats: BundleStats, outputPath: string, options: 
   fs.writeFileSync(outputPath, finalHtml, 'utf8');
 }
 
+export function extractStatsFromReport(html: string): BundleStats | null {
+  const match = html.match(/window\.__BUNDLE_STATS__\s*=\s*(\{[\s\S]*?\});/);
+  if (!match) return null;
+  try {
+    return JSON.parse(match[1]) as BundleStats;
+  } catch {
+    return null;
+  }
+}
+
 function readAsset(filename: string): string {
   try {
     return fs.readFileSync(path.join(UI_DIR, filename), 'utf8');

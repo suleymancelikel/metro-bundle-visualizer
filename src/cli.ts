@@ -7,7 +7,7 @@ import * as os from 'os';
 import * as fs from 'fs';
 import { detect } from './detect';
 import { runBundle } from './bundle';
-import { generateReport } from './report';
+import { generateReport, extractStatsFromReport } from './report';
 import type { BundleStats } from './serializer';
 
 const pkg = JSON.parse(
@@ -30,6 +30,7 @@ program
   .option('--json [path]', 'Write bundle stats JSON (default: ./bundle-stats.json)')
   .option('--quiet', 'Suppress progress output (errors always shown)', false)
   .option('--budget <bytes>', 'Warn if total bundle size exceeds this many bytes', (v) => parseInt(v, 10))
+  .option('--compare <path>', 'Path to a previous bundle-report.html to show size deltas')
   .parse(process.argv);
 
 const opts = program.opts<{
@@ -43,6 +44,7 @@ const opts = program.opts<{
   json?: string | boolean;
   quiet: boolean;
   budget?: number;
+  compare?: string;
 }>();
 
 export function resolveProjectRoot(flag: string | undefined): string {
@@ -172,7 +174,22 @@ async function main(): Promise<void> {
   const totalMB = (stats.totalBytes / 1024 / 1024).toFixed(2);
   if (!opts.quiet) console.log(`\nBundle complete — ${totalMB} MB (${stats.modules.length} modules)`);
 
-  generateReport(stats, outputPath, { budget: opts.budget });
+  let previousStats: BundleStats | undefined;
+  if (opts.compare) {
+    try {
+      const compareHtml = fs.readFileSync(opts.compare, 'utf8');
+      const extracted = extractStatsFromReport(compareHtml);
+      if (extracted) {
+        previousStats = extracted;
+      } else {
+        process.stderr.write('[metro-bundle-visualizer] Warning: could not extract stats from --compare file\n');
+      }
+    } catch {
+      process.stderr.write(`[metro-bundle-visualizer] Warning: --compare file not readable: ${opts.compare}\n`);
+    }
+  }
+
+  generateReport(stats, outputPath, { budget: opts.budget, previousStats });
   if (!opts.quiet) console.log(`\nReport saved to: ${outputPath}`);
 
   const jsonOutputPath = resolveJsonPath(opts.json);

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { generateReport } from '../src/report';
+import { generateReport, extractStatsFromReport } from '../src/report';
 import type { BundleStats } from '../src/serializer';
 
 const mockStats: BundleStats = {
@@ -187,6 +187,23 @@ describe('generateReport', () => {
       expect(html).toContain('__PREV_STATS__');
       expect(html).toContain('5000000');
     });
+  });
+
+  it('extracts stats from a generated report HTML', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      const extracted = extractStatsFromReport(html);
+      expect(extracted).not.toBeNull();
+      expect(extracted!.totalBytes).toBe(mockStats.totalBytes);
+      expect(extracted!.modules).toHaveLength(mockStats.modules.length);
+    });
+  });
+
+  it('extractStatsFromReport returns null if stats not found in HTML', () => {
+    const result = extractStatsFromReport('<html><body>no stats here</body></html>');
+    expect(result).toBeNull();
   });
 
   it('escapes </script> sequences in injected JSON (XSS prevention)', () => {
