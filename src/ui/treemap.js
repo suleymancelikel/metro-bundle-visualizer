@@ -37,7 +37,7 @@
   const stats = window.__BUNDLE_STATS__;
   if (!stats) return;
 
-  const budget = window.__BUNDLE_BUDGET__ || null;
+  const budget = window.__BUNDLE_BUDGET__ != null ? window.__BUNDLE_BUDGET__ : null;
 
   if (budget !== null && stats.totalBytes > budget) {
     const stripEl = document.getElementById('budget-strip');
