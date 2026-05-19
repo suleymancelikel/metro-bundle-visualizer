@@ -163,12 +163,12 @@ describe('generateReport', () => {
     });
   });
 
-  it('does not inject budget when not provided', () => {
+  it('does not inject budget assignment when not provided', () => {
     withTmpDir(dir => {
       const outputPath = path.join(dir, 'report.html');
       generateReport(mockStats, outputPath);
       const html = fs.readFileSync(outputPath, 'utf8');
-      expect(html).not.toContain('__BUNDLE_BUDGET__');
+      expect(html).not.toContain('window.__BUNDLE_BUDGET__ =');
     });
   });
 

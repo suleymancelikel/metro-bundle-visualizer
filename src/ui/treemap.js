@@ -1,8 +1,35 @@
 (function () {
   'use strict';
 
+  // --- Helpers ---
+  function formatBytes(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return bytes + ' B';
+  }
+
+  function formatBytesDetailed(bytes) {
+    if (bytes >= 1024 * 1024) return { value: (bytes / 1024 / 1024).toFixed(2), unit: 'MB' };
+    if (bytes >= 1024)        return { value: (bytes / 1024).toFixed(0),        unit: 'KB' };
+    return { value: String(bytes), unit: 'B' };
+  }
+
   const stats = window.__BUNDLE_STATS__;
   if (!stats) return;
+
+  const budget = window.__BUNDLE_BUDGET__ || null;
+
+  if (budget !== null && stats.totalBytes > budget) {
+    const stripEl = document.getElementById('budget-strip');
+    const msgEl   = document.getElementById('budget-strip-msg');
+    if (stripEl) stripEl.style.display = 'flex';
+    if (msgEl) {
+      const over = stats.totalBytes - budget;
+      msgEl.textContent =
+        'Bundle exceeds budget by ' + formatBytes(over) +
+        ' (' + formatBytes(stats.totalBytes) + ' / ' + formatBytes(budget) + ' limit)';
+    }
+  }
 
   // --- XSS-safe escape helper ---
   function escapeHtml(str) {
@@ -489,18 +516,5 @@
   // --- Init ---
   restoreState();
   render(currentFilter);
-
-  // --- Helpers ---
-  function formatBytes(bytes) {
-    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
-    if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
-    return bytes + ' B';
-  }
-
-  function formatBytesDetailed(bytes) {
-    if (bytes >= 1024 * 1024) return { value: (bytes / 1024 / 1024).toFixed(2), unit: 'MB' };
-    if (bytes >= 1024)        return { value: (bytes / 1024).toFixed(0),        unit: 'KB' };
-    return { value: String(bytes), unit: 'B' };
-  }
 
 })();

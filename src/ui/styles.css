@@ -15,6 +15,8 @@
   --bg-header-stop: #101012;
   --warn: #f5a524;
   --danger: #f25555;
+  --danger-bg: rgba(242,85,85,0.12);
+  --danger-border: rgba(242,85,85,0.3);
   --success: #4ade80;
   --mono: ui-monospace, 'JetBrains Mono', 'SF Mono', Menlo, monospace;
   --pkg-strip-bg: rgba(0,0,0,0.35);
@@ -263,6 +265,19 @@ body {
   flex-shrink: 0;
   font-family: var(--mono);
 }
+
+.budget-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 20px;
+  background: var(--danger-bg);
+  border-bottom: 1px solid var(--danger-border);
+  font-size: 12px;
+  color: var(--warn);
+  flex-shrink: 0;
+}
+.budget-strip__icon { font-size: 14px; }
 
 .tooltip {
   position: fixed;
