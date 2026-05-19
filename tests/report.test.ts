@@ -153,6 +153,42 @@ describe('generateReport', () => {
     });
   });
 
+  it('injects budget threshold into generated report when provided', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath, { budget: 2 * 1024 * 1024 });
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('__BUNDLE_BUDGET__');
+      expect(html).toContain('2097152');
+    });
+  });
+
+  it('does not inject budget when not provided', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).not.toContain('__BUNDLE_BUDGET__');
+    });
+  });
+
+  it('injects previous stats into generated report when provided', () => {
+    const prevStats: BundleStats = {
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      platform: 'ios',
+      totalBytes: 5000000,
+      projectName: 'OldApp',
+      modules: [{ path: 'index.js', size: 5000000, package: '<app>' }],
+    };
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath, { previousStats: prevStats });
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('__PREV_STATS__');
+      expect(html).toContain('5000000');
+    });
+  });
+
   it('escapes </script> sequences in injected JSON (XSS prevention)', () => {
     const maliciousStats: BundleStats = {
       ...mockStats,

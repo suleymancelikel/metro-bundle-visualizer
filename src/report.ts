@@ -4,7 +4,12 @@ import type { BundleStats } from './serializer';
 
 const UI_DIR = path.join(__dirname, 'ui');
 
-export function generateReport(stats: BundleStats, outputPath: string): void {
+export interface ReportOptions {
+  budget?: number;
+  previousStats?: BundleStats;
+}
+
+export function generateReport(stats: BundleStats, outputPath: string, options: ReportOptions = {}): void {
   const template = fs.readFileSync(path.join(UI_DIR, 'template.html'), 'utf8');
 
   // JSON injection safety: escape </script> sequences
@@ -24,8 +29,28 @@ export function generateReport(stats: BundleStats, outputPath: string): void {
     .replace('/* TREEMAP_PLACEHOLDER */', () => treemap)
     .replace('/* TITLE_PLACEHOLDER */', `Bundle Report — ${stats.projectName ?? 'app'} (${stats.platform})`);
 
+  let finalHtml = html;
+
+  if (options.budget !== undefined) {
+    finalHtml = finalHtml.replace(
+      '</body>',
+      `<script>window.__BUNDLE_BUDGET__ = ${options.budget};</script>\n</body>`
+    );
+  }
+
+  if (options.previousStats) {
+    const prevJson = JSON.stringify(options.previousStats)
+      .replace(/</g, '\\u003c')
+      .replace(/>/g, '\\u003e')
+      .replace(/&/g, '\\u0026');
+    finalHtml = finalHtml.replace(
+      '</body>',
+      `<script>window.__PREV_STATS__ = ${prevJson};</script>\n</body>`
+    );
+  }
+
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
-  fs.writeFileSync(outputPath, html, 'utf8');
+  fs.writeFileSync(outputPath, finalHtml, 'utf8');
 }
 
 function readAsset(filename: string): string {

@@ -29,6 +29,7 @@ program
   .option('--project-root <path>', 'Root directory of the React Native project (default: cwd)')
   .option('--json [path]', 'Write bundle stats JSON (default: ./bundle-stats.json)')
   .option('--quiet', 'Suppress progress output (errors always shown)', false)
+  .option('--budget <bytes>', 'Warn if total bundle size exceeds this many bytes', (v) => parseInt(v, 10))
   .parse(process.argv);
 
 const opts = program.opts<{
@@ -41,6 +42,7 @@ const opts = program.opts<{
   projectRoot?: string;
   json?: string | boolean;
   quiet: boolean;
+  budget?: number;
 }>();
 
 export function resolveProjectRoot(flag: string | undefined): string {
@@ -170,7 +172,7 @@ async function main(): Promise<void> {
   const totalMB = (stats.totalBytes / 1024 / 1024).toFixed(2);
   if (!opts.quiet) console.log(`\nBundle complete — ${totalMB} MB (${stats.modules.length} modules)`);
 
-  generateReport(stats, outputPath);
+  generateReport(stats, outputPath, { budget: opts.budget });
   if (!opts.quiet) console.log(`\nReport saved to: ${outputPath}`);
 
   const jsonOutputPath = resolveJsonPath(opts.json);
