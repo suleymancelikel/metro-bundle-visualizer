@@ -52,7 +52,59 @@
     return { name: 'root', children };
   }
 
-  const api = { categoryOf, buildHierarchy };
+  function applyFilters(tree, opts) {
+    const minSize = (opts && opts.minSize) || 0;
+    const hidden = new Set((opts && opts.hiddenCategories) || []);
+
+    let visiblePackages = 0;
+    let groupedPackages = 0;
+    let totalPackages = 0;
+    let hiddenCategoryCount = 0;
+
+    const children = [];
+    for (const cat of tree.children) {
+      totalPackages += cat.children.length;
+      if (hidden.has(cat.name)) {
+        hiddenCategoryCount += 1;
+        continue;
+      }
+      const kept = [];
+      const small = [];
+      for (const pkg of cat.children) {
+        if (pkg.size >= minSize) kept.push(pkg);
+        else small.push(pkg);
+      }
+      visiblePackages += kept.length;
+      groupedPackages += small.length;
+
+      const catChildren = kept.slice();
+      if (small.length > 0) {
+        catChildren.push({
+          name: 'Other (' + small.length + ' small package' + (small.length === 1 ? '' : 's') + ')',
+          size: small.reduce((s, p) => s + p.size, 0),
+          _isPackage: true,
+          _isOther: true,
+          _groupedPackages: small,
+          files: [],
+          children: [],
+        });
+      }
+      children.push({ name: cat.name, _isCategory: true, children: catChildren });
+    }
+
+    return {
+      name: 'root',
+      children,
+      _summary: {
+        visiblePackages,
+        groupedPackages,
+        hiddenCategories: hiddenCategoryCount,
+        totalPackages,
+      },
+    };
+  }
+
+  const api = { categoryOf, buildHierarchy, applyFilters };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
   }

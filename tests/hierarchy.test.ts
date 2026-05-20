@@ -75,3 +75,63 @@ describe('buildHierarchy', () => {
     expect(tree.children).toEqual([]);
   });
 });
+
+import { applyFilters } from '../src/ui/hierarchy';
+
+describe('applyFilters', () => {
+  const baseTree = {
+    name: 'root',
+    children: [
+      {
+        name: 'other', _isCategory: true,
+        children: [
+          { name: 'big',   size: 50_000, _isPackage: true, files: [], children: [] },
+          { name: 'small', size: 1_000,  _isPackage: true, files: [], children: [] },
+          { name: 'tiny',  size: 200,    _isPackage: true, files: [], children: [] },
+        ],
+      },
+      {
+        name: 'app', _isCategory: true,
+        children: [{ name: '<app>', size: 100_000, _isPackage: true, files: [], children: [] }],
+      },
+    ],
+  };
+
+  it('removes hidden categories entirely', () => {
+    const out = applyFilters(baseTree, { minSize: 0, hiddenCategories: ['app'] });
+    expect(out.children.map((c: any) => c.name)).toEqual(['other']);
+  });
+
+  it('rolls packages below minSize into "Other" within each category', () => {
+    const out = applyFilters(baseTree, { minSize: 5_000, hiddenCategories: [] });
+    const other = out.children.find((c: any) => c.name === 'other')!;
+    expect(other.children.map((p: any) => p.name).sort())
+      .toEqual(['Other (2 small packages)', 'big'].sort());
+    const rollup = other.children.find((p: any) => p.name.startsWith('Other'))!;
+    expect(rollup.size).toBe(1_200);
+    expect(rollup._isOther).toBe(true);
+    expect(rollup._groupedPackages).toHaveLength(2);
+  });
+
+  it('does not create a rollup if no packages are below threshold', () => {
+    const out = applyFilters(baseTree, { minSize: 100, hiddenCategories: [] });
+    const other = out.children.find((c: any) => c.name === 'other')!;
+    expect(other.children.find((p: any) => p._isOther)).toBeUndefined();
+  });
+
+  it('returns a new tree (does not mutate input)', () => {
+    const before = JSON.stringify(baseTree);
+    applyFilters(baseTree, { minSize: 5_000, hiddenCategories: ['app'] });
+    expect(JSON.stringify(baseTree)).toBe(before);
+  });
+
+  it('reports a summary of filter results', () => {
+    const out = applyFilters(baseTree, { minSize: 5_000, hiddenCategories: ['app'] });
+    expect(out._summary).toEqual({
+      visiblePackages: 1,
+      groupedPackages: 2,
+      hiddenCategories: 1,
+      totalPackages: 4,
+    });
+  });
+});
