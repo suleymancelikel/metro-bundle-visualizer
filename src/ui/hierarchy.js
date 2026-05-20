@@ -10,7 +10,49 @@
     return 'other';
   }
 
-  const api = { categoryOf };
+  function buildHierarchy(stats) {
+    const pkgMap = new Map();
+    for (const mod of stats.modules || []) {
+      const existing = pkgMap.get(mod.package);
+      if (existing) {
+        existing.size += mod.size;
+        existing.files.push(mod);
+      } else {
+        pkgMap.set(mod.package, { name: mod.package, size: mod.size, files: [mod] });
+      }
+    }
+
+    const catMap = new Map();
+    for (const pkg of pkgMap.values()) {
+      const cat = categoryOf(pkg.name);
+      if (!catMap.has(cat)) catMap.set(cat, []);
+      catMap.get(cat).push(pkg);
+    }
+
+    const children = [];
+    for (const [cat, pkgs] of catMap) {
+      children.push({
+        name: cat,
+        _isCategory: true,
+        children: pkgs.map(pkg => ({
+          name: pkg.name,
+          size: pkg.size,
+          _isPackage: true,
+          files: pkg.files,
+          children: pkg.files.map(f => ({
+            name: f.path,
+            size: f.size,
+            _pkg: pkg.name,
+            files: [f],
+          })),
+        })),
+      });
+    }
+
+    return { name: 'root', children };
+  }
+
+  const api = { categoryOf, buildHierarchy };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
   }
