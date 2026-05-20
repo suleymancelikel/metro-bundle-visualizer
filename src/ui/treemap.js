@@ -74,42 +74,36 @@
       .replace(/>/g, '&gt;');
   }
 
-  // --- Data aggregation ---
+  // --- Data layer ---
+  const fullHierarchy = window.MBV_HIERARCHY.buildHierarchy(stats);
+
   const pkgMap = new Map();
-  for (const mod of stats.modules) {
-    const existing = pkgMap.get(mod.package);
-    if (existing) {
-      existing.size += mod.size;
-      existing.files.push(mod);
-    } else {
-      pkgMap.set(mod.package, { name: mod.package, size: mod.size, files: [mod] });
+  for (const cat of fullHierarchy.children) {
+    for (const pkg of cat.children) {
+      pkgMap.set(pkg.name, pkg);
     }
   }
 
-  const hierarchyData = {
-    name: 'root',
-    children: [...pkgMap.values()].map(pkg => ({
-      name: pkg.name,
-      size: pkg.size,
-      _isPackage: true,
-      files: pkg.files,
-      children: pkg.files.map(f => ({
-        name: f.path,
-        size: f.size,
-        _pkg: pkg.name,
-        files: [f],
-      })),
-    })),
-  };
+  // UI state — drives applyFilters re-runs
+  let minSizeBytes = 10 * 1024;
+  const hiddenCategories = new Set();
 
-  // Pre-compute lowercase path cache once at init (not per keystroke)
+  // Pre-compute lowercase path cache once at init
   const pkgFilePathCache = new Map();
   for (const [name, pkg] of pkgMap) {
     pkgFilePathCache.set(name, (pkg.files || []).map(f => (f.path || '').toLowerCase()));
   }
 
-  const root = d3.hierarchy(hierarchyData)
-    .sum(d => (d.children ? 0 : d.size) || 0)
+  function currentFilteredTree() {
+    return window.MBV_HIERARCHY.applyFilters(fullHierarchy, {
+      minSize: minSizeBytes,
+      hiddenCategories: [...hiddenCategories],
+    });
+  }
+
+  let filteredTree = currentFilteredTree();
+  let root = d3.hierarchy(filteredTree)
+    .sum(d => (d.children && d.children.length) ? 0 : (d.size || 0))
     .sort((a, b) => (b.value || 0) - (a.value || 0));
 
   // --- Semantic color by package category ---
@@ -203,6 +197,45 @@
   let tooltipRafId = null;
   let focusedPkg = null;
 
+  function sliderValueFromBytes(bytes) {
+    if (bytes <= 0) return 0;
+    return Math.round(Math.log(bytes / 1024 + 1) / Math.log(2) * 10);
+  }
+  function bytesFromSliderValue(v) {
+    if (v <= 0) return 0;
+    return Math.round((Math.pow(2, v / 10) - 1) * 1024);
+  }
+
+  function rebuildAndRender() {
+    filteredTree = currentFilteredTree();
+    root = d3.hierarchy(filteredTree)
+      .sum(d => (d.children && d.children.length) ? 0 : (d.size || 0))
+      .sort((a, b) => (b.value || 0) - (a.value || 0));
+    updateFilterSummary();
+    updateResetVisibility();
+    render(currentFilter);
+  }
+
+  function updateFilterSummary() {
+    const el = document.getElementById('sb-filter-summary');
+    if (!el || !filteredTree._summary) return;
+    const s = filteredTree._summary;
+    if (s.visiblePackages === s.totalPackages) {
+      el.textContent = 'Click a package to inspect its files';
+      return;
+    }
+    el.textContent = 'Showing ' + s.visiblePackages + ' of ' + s.totalPackages +
+      ' packages (' + s.groupedPackages + ' grouped' +
+      (s.hiddenCategories ? ', ' + s.hiddenCategories + ' categories hidden' : '') + ')';
+  }
+
+  function updateResetVisibility() {
+    const btn = document.getElementById('controls-reset');
+    if (!btn) return;
+    const hasFilters = minSizeBytes > 0 || hiddenCategories.size > 0;
+    btn.style.display = hasFilters ? 'inline-block' : 'none';
+  }
+
   // --- Render function ---
   function render(filterText) {
     currentFilter = filterText.toLowerCase();
@@ -214,14 +247,20 @@
       const pkg = pkgMap.get(focusedPkg);
       dataChildren = pkg ? pkg.files.map(f => ({ name: f.path, size: f.size, _pkg: pkg.name, files: [f] })) : [];
     } else {
-      dataChildren = root.children
-        ? root.children.filter(c => {
-            if (!currentFilter) return true;
-            if ((c.data.name || '').toLowerCase().includes(currentFilter)) return true;
-            const paths = pkgFilePathCache.get(c.data.name) || [];
-            return paths.some(p => p.includes(currentFilter));
-          }).map(c => c.data)
-        : [];
+      // Flatten visible categories into a one-level package list (Phase A render)
+      const flat = [];
+      for (const cat of (root.children || [])) {
+        for (const pkg of (cat.children || [])) {
+          flat.push(pkg);
+        }
+      }
+      dataChildren = flat.filter(c => {
+        if (!currentFilter) return true;
+        const name = (c.data.name || '').toLowerCase();
+        if (name.includes(currentFilter)) return true;
+        const paths = pkgFilePathCache.get(c.data.name) || [];
+        return paths.some(p => p.includes(currentFilter));
+      }).map(c => c.data);
     }
 
     if (dataChildren.length === 0) {
@@ -277,6 +316,8 @@
       .join('g')
       .attr('class', 'node')
       .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+    nodes.classed('node--other', d => !!d.data._isOther);
 
     nodes.append('rect')
       .attr('width', d => Math.max(0, d.x1 - d.x0))
@@ -370,6 +411,10 @@
         if (selectedNode) d3.select(selectedNode).classed('selected', false);
         selectedNode = this;
         d3.select(this).classed('selected', true);
+        if (d.data._isOther) {
+          showOtherSidebar(d.data._groupedPackages);
+          return;
+        }
         const pkgName = d.data._pkg || d.data.name;
         const pkg = pkgMap.get(pkgName) || { name: pkgName, size: d.value, files: d.data.files || [] };
         showSidebar(pkg);
@@ -378,7 +423,9 @@
     const countEl = document.getElementById('search-count');
     if (countEl) {
       if (currentFilter && !focusedPkg) {
-        const total = root.children ? root.children.length : 0;
+        const total = root.children
+          ? root.children.reduce((n, c) => n + (c.children ? c.children.length : 0), 0)
+          : 0;
         countEl.textContent = dataChildren.length + ' / ' + total;
       } else {
         countEl.textContent = '';
@@ -527,6 +574,62 @@
     }
   }
 
+  function showOtherSidebar(packages) {
+    const overview = document.getElementById('sb-overview');
+    if (overview) overview.style.display = 'none';
+    const sidebar = document.getElementById('sidebar');
+    const content = document.querySelector('.sidebar-content');
+    if (!sidebar || !content) return;
+    sidebar.classList.remove('sidebar--empty');
+    content.style.display = 'block';
+
+    const sbName = document.getElementById('sb-name');
+    const sbBadge = document.getElementById('sb-badge');
+    const sbFileList = document.getElementById('sb-file-list');
+    if (sbBadge) sbBadge.textContent = 'group';
+    if (sbName)  sbName.textContent  = packages.length + ' small packages';
+
+    const totalSize = packages.reduce((s, p) => s + p.size, 0);
+    const sizeDetailed = formatBytesDetailed(totalSize);
+    const sbSizeEl = document.getElementById('sb-size-val');
+    if (sbSizeEl) {
+      while (sbSizeEl.firstChild) sbSizeEl.removeChild(sbSizeEl.firstChild);
+      sbSizeEl.appendChild(document.createTextNode(sizeDetailed.value));
+      const u = document.createElement('span'); u.className = 'unit'; u.textContent = sizeDetailed.unit;
+      sbSizeEl.appendChild(u);
+    }
+
+    if (sbFileList) {
+      sbFileList.innerHTML = '';
+      const sorted = [...packages].sort((a, b) => b.size - a.size);
+      const maxSz = sorted[0] ? sorted[0].size : 1;
+      for (const pkg of sorted) {
+        const li = document.createElement('li');
+        li.className = 'file-bar';
+        li.style.setProperty('--bar', (pkg.size / maxSz * 100).toFixed(1) + '%');
+        li.style.cursor = 'pointer';
+        const nameSpan = document.createElement('span');
+        nameSpan.className = 'file-bar__name';
+        nameSpan.textContent = pkg.name;
+        const sizeSpan = document.createElement('span');
+        sizeSpan.className = 'file-bar__size';
+        sizeSpan.textContent = formatBytes(pkg.size);
+        li.appendChild(nameSpan);
+        li.appendChild(sizeSpan);
+        li.addEventListener('click', () => {
+          minSizeBytes = Math.max(0, pkg.size - 1);
+          rebuildAndRender();
+          const slider = document.getElementById('min-size');
+          if (slider) slider.value = String(sliderValueFromBytes(minSizeBytes));
+          const sliderLabel = document.getElementById('min-size-value');
+          if (sliderLabel) sliderLabel.textContent = formatBytes(minSizeBytes);
+          showSidebar(pkg);
+        });
+        sbFileList.appendChild(li);
+      }
+    }
+  }
+
   // --- Search ---
   let searchTimer;
   const searchEl = document.getElementById('search');
@@ -548,6 +651,57 @@
         searchEl.dispatchEvent(new Event('input'));
       }
       searchClearEl.style.display = 'none';
+    });
+  }
+
+  // --- Chip handlers ---
+  let renderRaf = null;
+  function scheduleRebuild() {
+    if (renderRaf) cancelAnimationFrame(renderRaf);
+    renderRaf = requestAnimationFrame(() => {
+      renderRaf = null;
+      rebuildAndRender();
+      encodeState();
+    });
+  }
+
+  document.querySelectorAll('#cat-chips .chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const cat = chip.getAttribute('data-cat');
+      if (hiddenCategories.has(cat)) {
+        hiddenCategories.delete(cat);
+        chip.classList.remove('chip--off');
+      } else {
+        hiddenCategories.add(cat);
+        chip.classList.add('chip--off');
+      }
+      scheduleRebuild();
+    });
+  });
+
+  // --- Slider handler ---
+  const sliderEl = document.getElementById('min-size');
+  const sliderLabel = document.getElementById('min-size-value');
+  if (sliderEl) {
+    sliderEl.value = String(sliderValueFromBytes(minSizeBytes));
+    if (sliderLabel) sliderLabel.textContent = formatBytes(minSizeBytes);
+    sliderEl.addEventListener('input', function () {
+      minSizeBytes = bytesFromSliderValue(parseInt(this.value, 10));
+      if (sliderLabel) sliderLabel.textContent = formatBytes(minSizeBytes);
+      scheduleRebuild();
+    });
+  }
+
+  // --- Reset button ---
+  const resetBtn = document.getElementById('controls-reset');
+  if (resetBtn) {
+    resetBtn.addEventListener('click', () => {
+      hiddenCategories.clear();
+      minSizeBytes = 0;
+      document.querySelectorAll('#cat-chips .chip').forEach(c => c.classList.remove('chip--off'));
+      if (sliderEl) sliderEl.value = '0';
+      if (sliderLabel) sliderLabel.textContent = '0 B';
+      scheduleRebuild();
     });
   }
 
@@ -589,6 +743,10 @@
     const parts = [];
     if (currentFilter) parts.push('q=' + encodeURIComponent(currentFilter));
     if (focusedPkg)    parts.push('pkg=' + encodeURIComponent(focusedPkg));
+    if (minSizeBytes > 0) parts.push('min=' + Math.round(minSizeBytes / 1024));
+    if (hiddenCategories.size > 0) {
+      parts.push('cat=' + [...hiddenCategories].map(c => '-' + c).join(','));
+    }
     history.replaceState(null, '', parts.length ? '#' + parts.join('&') : location.pathname + location.search);
   }
 
@@ -609,10 +767,24 @@
       if (breadcrumb)    breadcrumb.style.display = 'flex';
       if (breadcrumbPkg) breadcrumbPkg.textContent = pkg;
     }
+    const min = params.get('min');
+    if (min) {
+      minSizeBytes = parseInt(min, 10) * 1024;
+    }
+    const cat = params.get('cat');
+    if (cat) {
+      cat.split(',').forEach(token => {
+        const name = token.startsWith('-') ? token.slice(1) : token;
+        if (name) hiddenCategories.add(name);
+      });
+      document.querySelectorAll('#cat-chips .chip').forEach(chip => {
+        if (hiddenCategories.has(chip.getAttribute('data-cat'))) chip.classList.add('chip--off');
+      });
+    }
   }
 
   // --- Init ---
   restoreState();
-  render(currentFilter);
+  rebuildAndRender();
 
 })();
