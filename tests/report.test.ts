@@ -261,6 +261,23 @@ describe('generateReport', () => {
     });
   });
 
+  it('renders the controls strip with chips and slider', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('id="controls"');
+      expect(html).toContain('data-cat="app"');
+      expect(html).toContain('data-cat="react-native"');
+      expect(html).toContain('data-cat="babel"');
+      expect(html).toContain('data-cat="scoped"');
+      expect(html).toContain('data-cat="other"');
+      expect(html).toContain('id="min-size"');
+      expect(html).toContain('id="controls-reset"');
+      expect(html).toContain('id="sb-filter-summary"');
+    });
+  });
+
   it('injects hierarchy.js before treemap.js', () => {
     withTmpDir(dir => {
       const outputPath = path.join(dir, 'report.html');
