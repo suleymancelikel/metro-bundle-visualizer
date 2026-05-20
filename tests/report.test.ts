@@ -260,4 +260,16 @@ describe('generateReport', () => {
       expect(html).toContain('\\u003c/script\\u003e');
     });
   });
+
+  it('injects hierarchy.js before treemap.js', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      const hIdx = html.indexOf('MBV_HIERARCHY');
+      const tIdx = html.indexOf('KNOWN_HEAVY');
+      expect(hIdx).toBeGreaterThan(0);
+      expect(tIdx).toBeGreaterThan(hIdx);
+    });
+  });
 });

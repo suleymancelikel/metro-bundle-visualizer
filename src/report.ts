@@ -20,6 +20,7 @@ export function generateReport(stats: BundleStats, outputPath: string, options: 
 
   const styles = readAsset('styles.css');
   const d3 = readAsset('d3.min.js');
+  const hierarchy = readAsset('hierarchy.js');
   const treemap = readAsset('treemap.js');
 
   let preTreemapScripts = '';
@@ -40,7 +41,7 @@ export function generateReport(stats: BundleStats, outputPath: string, options: 
     .replace('/* D3_PLACEHOLDER */', () => d3)
     .replace(
       '<script>/* TREEMAP_PLACEHOLDER */</script>',
-      () => preTreemapScripts + '<script>' + treemap + '</script>'
+      () => preTreemapScripts + '<script>' + hierarchy + '</script>\n  <script>' + treemap + '</script>'
     )
     .replace('/* TITLE_PLACEHOLDER */', `Bundle Report — ${stats.projectName ?? 'app'} (${stats.platform})`);
 
