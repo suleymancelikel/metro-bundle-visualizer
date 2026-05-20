@@ -49,7 +49,7 @@ describe('buildHierarchy', () => {
       ['app', 'babel', 'other'].sort()
     );
 
-    const app = tree.children.find((c: any) => c.name === 'app');
+    const app = tree.children.find((c: any) => c.name === 'app')!;
     expect(app.children).toHaveLength(1);
     expect(app.children[0].name).toBe('<app>');
     expect(app.children[0].children).toHaveLength(2);
@@ -57,7 +57,7 @@ describe('buildHierarchy', () => {
 
   it('sums package size from its files', () => {
     const tree = buildHierarchy(stats);
-    const babel = tree.children.find((c: any) => c.name === 'babel');
+    const babel = tree.children.find((c: any) => c.name === 'babel')!;
     const runtime = babel.children[0];
     expect(runtime.name).toBe('@babel/runtime');
     expect(runtime.size).toBe(80);

@@ -3,7 +3,7 @@ export type Category = 'app' | 'react-native' | 'babel' | 'scoped' | 'other';
 export interface HierarchyNode {
   name: string;
   size?: number;
-  children?: HierarchyNode[];
+  children: HierarchyNode[];
   files?: Array<{ path: string; size: number; package: string }>;
   _isCategory?: boolean;
   _isPackage?: boolean;
