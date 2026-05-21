@@ -104,7 +104,24 @@
     };
   }
 
-  const api = { categoryOf, buildHierarchy, applyFilters };
+  function rollupFiles(files, minSize) {
+    const kept = [];
+    const small = [];
+    for (const f of files) {
+      if (f.size >= minSize) kept.push(f);
+      else small.push(f);
+    }
+    if (small.length === 0) return kept;
+    kept.push({
+      name: 'Other (' + small.length + ' small file' + (small.length === 1 ? '' : 's') + ')',
+      size: small.reduce((s, f) => s + f.size, 0),
+      _isOther: true,
+      _groupedFiles: small,
+    });
+    return kept;
+  }
+
+  const api = { categoryOf, buildHierarchy, applyFilters, rollupFiles };
   if (typeof module !== 'undefined' && module.exports) {
     module.exports = api;
   }

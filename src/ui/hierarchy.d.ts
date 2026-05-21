@@ -10,6 +10,7 @@ export interface HierarchyNode {
   _isOther?: boolean;
   _pkg?: string;
   _groupedPackages?: HierarchyNode[];
+  _groupedFiles?: Array<{ name: string; size: number }>;
 }
 
 export function categoryOf(name: string): Category;
@@ -25,10 +26,13 @@ export interface FilterSummary {
 
 export function applyFilters(tree: HierarchyNode, opts: { minSize?: number; hiddenCategories?: string[] }): HierarchyNode & { _summary: FilterSummary };
 
+export function rollupFiles(files: Array<{ name: string; size: number }>, minSize: number): Array<{ name: string; size: number; _isOther?: boolean; _groupedFiles?: any[] }>;
+
 export interface Hierarchy {
   categoryOf: typeof categoryOf;
   buildHierarchy: typeof buildHierarchy;
   applyFilters: typeof applyFilters;
+  rollupFiles: typeof rollupFiles;
 }
 
 declare global {

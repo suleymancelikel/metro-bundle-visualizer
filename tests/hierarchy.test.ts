@@ -135,3 +135,27 @@ describe('applyFilters', () => {
     });
   });
 });
+
+import { rollupFiles } from '../src/ui/hierarchy';
+
+describe('rollupFiles', () => {
+  it('groups files below minSize into an Other node', () => {
+    const files = [
+      { name: 'a.js', size: 5000 },
+      { name: 'b.js', size: 500 },
+      { name: 'c.js', size: 300 },
+    ];
+    const out = rollupFiles(files, 1024);
+    expect(out.map((n: any) => n.name)).toEqual(['a.js', 'Other (2 small files)']);
+    const other = out[1];
+    expect(other._isOther).toBe(true);
+    expect(other.size).toBe(800);
+  });
+
+  it('returns input unchanged when nothing below threshold', () => {
+    const files = [{ name: 'a.js', size: 5000 }];
+    const out = rollupFiles(files, 1024);
+    expect(out).toHaveLength(1);
+    expect(out[0]._isOther).toBeUndefined();
+  });
+});

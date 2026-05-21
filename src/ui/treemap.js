@@ -117,6 +117,14 @@
     return '#2d6a8c';
   }
 
+  function categoryToColorKey(cat) {
+    if (cat === 'app') return '<app>';
+    if (cat === 'react-native') return 'react-native';
+    if (cat === 'babel') return '@babel/runtime';
+    if (cat === 'scoped') return '@anything';
+    return 'unscoped';
+  }
+
   // --- Wire header ---
   const heroParts = formatBytesDetailed(stats.totalBytes);
   const heroValEl  = document.getElementById('hero-value');
@@ -129,6 +137,7 @@
   if (heroValEl)   heroValEl.textContent  = heroParts.value;
   if (heroUnitEl)  heroUnitEl.textContent = heroParts.unit;
   if (heroSubEl)   heroSubEl.textContent  = stats.modules.length + ' modules · ' + pkgMap.size + ' packages';
+  // hero header now renders inline: value · modules · packages (see .hero-stat in styles.css)
   if (platformEl)  platformEl.textContent = stats.platform || '';
   if (metaEl)      metaEl.textContent     = 'platform: ' + (stats.platform || '—');
   if (footerEl)    footerEl.textContent   = 'Generated ' + new Date(stats.generatedAt).toLocaleString() + ' · Sizes are pre-minification (~20–40% larger than shipped binary)';
@@ -168,7 +177,15 @@
         li.appendChild(sizeSpan);
         li.addEventListener('click', () => {
           showSidebar(pkg);
-          enterFocusMode(pkg.name);
+          if (viewMode === 'grouped') {
+            const cat = window.MBV_HIERARCHY.categoryOf(pkg.name);
+            drillPath = [cat, pkg.name];
+          } else {
+            drillPath = [pkg.name];
+          }
+          updateBreadcrumb();
+          render(currentFilter);
+          encodeState();
         });
         topList.appendChild(li);
       }
@@ -192,10 +209,70 @@
     .attr('height', height);
 
   const g = svg.append('g');
+
   let currentFilter = '';
   let selectedNode = null;
   let tooltipRafId = null;
-  let focusedPkg = null;
+  // viewMode: 'flat' (default — packages across all categories) or 'grouped' (3-level category drill).
+  let viewMode = 'flat';
+  // Drill path semantics:
+  //   flat:    [] = all packages; [pkgName] = files of package
+  //   grouped: [] = categories; [cat] = packages in cat; [cat, pkgName] = files of package
+  let drillPath = [];
+
+  function maxDrillDepth() {
+    return viewMode === 'flat' ? 1 : 2;
+  }
+
+  function drillInto(name) {
+    if (drillPath.length >= maxDrillDepth()) return;
+    drillPath = drillPath.concat([name]);
+    updateBreadcrumb();
+    render(currentFilter);
+    encodeState();
+  }
+
+  function drillToLevel(level) {
+    drillPath = drillPath.slice(0, level);
+    updateBreadcrumb();
+    render(currentFilter);
+    encodeState();
+  }
+
+  function updateBreadcrumb() {
+    const bc = document.getElementById('breadcrumb');
+    if (!bc) return;
+    while (bc.firstChild) bc.removeChild(bc.firstChild);
+    for (let i = 0; i < drillPath.length; i++) {
+      const sep = document.createElement('span');
+      sep.className = 'breadcrumb__sep';
+      sep.textContent = '›';
+      bc.appendChild(sep);
+      const btn = document.createElement('button');
+      btn.className = 'breadcrumb__seg';
+      if (i === drillPath.length - 1) btn.classList.add('breadcrumb__seg--current');
+      btn.textContent = drillPath[i];
+      const targetLevel = i + 1;
+      btn.addEventListener('click', () => {
+        if (targetLevel === drillPath.length) return;
+        drillToLevel(targetLevel);
+      });
+      bc.appendChild(btn);
+    }
+  }
+
+  function setViewMode(mode) {
+    if (mode === viewMode) return;
+    viewMode = mode;
+    drillPath = [];
+    const btn = document.getElementById('view-toggle');
+    const lbl = document.getElementById('view-toggle-label');
+    if (btn) btn.setAttribute('aria-pressed', viewMode === 'grouped' ? 'true' : 'false');
+    if (lbl) lbl.textContent = viewMode === 'grouped' ? 'Ungroup' : 'Group by category';
+    updateBreadcrumb();
+    render(currentFilter);
+    encodeState();
+  }
 
   function sliderValueFromBytes(bytes) {
     if (bytes <= 0) return 0;
@@ -236,83 +313,124 @@
     btn.style.display = hasFilters ? 'inline-block' : 'none';
   }
 
-  // --- Render function ---
+  // --- Render function (level-aware) ---
   function render(filterText) {
-    currentFilter = filterText.toLowerCase();
+    currentFilter = (filterText || '').toLowerCase();
     g.selectAll('*').remove();
     svg.select('.treemap-empty-state').remove();
 
+    const level = drillPath.length;
     let dataChildren;
-    if (focusedPkg !== null) {
-      const pkg = pkgMap.get(focusedPkg);
-      dataChildren = pkg ? pkg.files.map(f => ({ name: f.path, size: f.size, _pkg: pkg.name, files: [f] })) : [];
+
+    if (viewMode === 'flat') {
+      if (level === 0) {
+        // Flatten all visible packages across all categories.
+        const pkgs = [];
+        for (const cat of (root.children || [])) {
+          for (const pkg of (cat.children || [])) {
+            pkgs.push(pkg);
+          }
+        }
+        dataChildren = pkgs.filter(c => {
+          if (!currentFilter) return true;
+          const name = (c.data.name || '').toLowerCase();
+          if (name.includes(currentFilter)) return true;
+          const paths = pkgFilePathCache.get(c.data.name) || [];
+          return paths.some(p => p.includes(currentFilter));
+        }).map(c => ({
+          name: c.data.name,
+          size: c.value || 0,
+          _isPackage: true,
+          _isOther: c.data._isOther,
+          _groupedPackages: c.data._groupedPackages,
+          files: c.data.files,
+        }));
+      } else {
+        // Files of a single package: find it via pkgMap.
+        const pkgName = drillPath[0];
+        const pkg = pkgMap.get(pkgName);
+        const rawFiles = pkg ? (pkg.files || []) : [];
+        dataChildren = window.MBV_HIERARCHY.rollupFiles(rawFiles, 1024).map(f => ({
+          name: f.name,
+          size: f.size,
+          _pkg: pkgName,
+          _isFile: true,
+          _isOther: f._isOther,
+          _groupedFiles: f._groupedFiles,
+        }));
+      }
     } else {
-      // Flatten visible categories into a one-level package list (Phase A render)
-      const flat = [];
-      for (const cat of (root.children || [])) {
-        for (const pkg of (cat.children || [])) {
-          flat.push(pkg);
+      // grouped mode — original 3-level walk.
+      let parent = root;
+      for (const name of drillPath) {
+        parent = (parent.children || []).find(c => c.data.name === name);
+        if (!parent) {
+          drillPath = [];
+          parent = root;
+          updateBreadcrumb();
+          break;
         }
       }
-      dataChildren = flat.filter(c => {
-        if (!currentFilter) return true;
-        const name = (c.data.name || '').toLowerCase();
-        if (name.includes(currentFilter)) return true;
-        const paths = pkgFilePathCache.get(c.data.name) || [];
-        return paths.some(p => p.includes(currentFilter));
-      }).map(c => c.data);
+      if (level === 0) {
+        dataChildren = (parent.children || []).map(c => ({
+          name: c.data.name,
+          size: c.value || 0,
+          _isCategoryBox: true,
+        }));
+      } else if (level === 1) {
+        dataChildren = (parent.children || []).filter(c => {
+          if (!currentFilter) return true;
+          const name = (c.data.name || '').toLowerCase();
+          if (name.includes(currentFilter)) return true;
+          const paths = pkgFilePathCache.get(c.data.name) || [];
+          return paths.some(p => p.includes(currentFilter));
+        }).map(c => ({
+          name: c.data.name,
+          size: c.value || 0,
+          _isPackage: true,
+          _isOther: c.data._isOther,
+          _groupedPackages: c.data._groupedPackages,
+          files: c.data.files,
+        }));
+      } else {
+        const rawFiles = (parent.children || []).map(c => c.data);
+        dataChildren = window.MBV_HIERARCHY.rollupFiles(rawFiles, 1024).map(f => ({
+          name: f.name,
+          size: f.size,
+          _pkg: drillPath[1],
+          _isFile: true,
+          _isOther: f._isOther,
+          _groupedFiles: f._groupedFiles,
+        }));
+      }
     }
+
+    // effLevel: 0=categories, 1=packages, 2=files. Decouples rendering from drill depth across viewModes.
+    let effLevel;
+    if (viewMode === 'grouped') effLevel = level;
+    else effLevel = level === 0 ? 1 : 2;
 
     if (dataChildren.length === 0) {
       svg.append('text')
         .attr('class', 'treemap-empty-state')
         .attr('x', '50%').attr('y', '50%')
         .attr('text-anchor', 'middle').attr('dominant-baseline', 'middle')
-        .text(currentFilter ? 'No packages match "' + currentFilter + '"' : 'No data');
+        .text(currentFilter ? 'No items match "' + currentFilter + '"' : 'No data');
       return;
     }
 
-    const filteredRoot = d3.hierarchy({ name: 'root', children: dataChildren })
-      .sum(d => (d.children ? 0 : d.size) || 0)
+    const layoutRoot = d3.hierarchy({ name: 'root', children: dataChildren })
+      .sum(d => (d.children && d.children.length) ? 0 : (d.size || 0))
       .sort((a, b) => (b.value || 0) - (a.value || 0));
-
-    const PKG_HEADER_H = focusedPkg ? 0 : 18;
 
     d3.treemap()
       .size([width, height])
-      .paddingOuter(3)
-      .paddingTop(d => d.depth === 1 && !focusedPkg ? PKG_HEADER_H : 0)
-      .paddingInner(1)
-      .round(true)(filteredRoot);
-
-    if (!focusedPkg) {
-      const pkgGroups = g.selectAll('.pkg-strip')
-        .data(filteredRoot.children || [])
-        .join('g')
-        .attr('class', 'pkg-strip')
-        .attr('transform', d => `translate(${d.x0},${d.y0})`);
-
-      pkgGroups.append('rect')
-        .attr('width', d => Math.max(0, d.x1 - d.x0))
-        .attr('height', PKG_HEADER_H);
-
-      pkgGroups.append('text')
-        .attr('x', 4).attr('y', PKG_HEADER_H - 4)
-        .text(d => {
-          const w = d.x1 - d.x0 - 8;
-          const name = d.data.name || '';
-          const maxChars = Math.floor(w / 6.5);
-          if (maxChars < 3) return '';
-          return name.length <= maxChars ? name : name.slice(0, maxChars - 1) + '…';
-        });
-
-      pkgGroups.on('click', function (_e, d) {
-        enterFocusMode(d.data.name);
-      });
-    }
+      .paddingOuter(effLevel === 0 ? 6 : 3)
+      .paddingInner(effLevel === 0 ? 4 : 1)
+      .round(true)(layoutRoot);
 
     const nodes = g.selectAll('.node')
-      .data(filteredRoot.leaves())
+      .data(layoutRoot.leaves())
       .join('g')
       .attr('class', 'node')
       .attr('transform', d => `translate(${d.x0},${d.y0})`);
@@ -322,34 +440,41 @@
     nodes.append('rect')
       .attr('width', d => Math.max(0, d.x1 - d.x0))
       .attr('height', d => Math.max(0, d.y1 - d.y0))
-      .attr('fill', d => categoryColor(d.data._pkg || d.data.name))
-      .attr('rx', 2);
+      .attr('fill', d => {
+        if (d.data._isCategoryBox) return categoryColor(categoryToColorKey(d.data.name));
+        return categoryColor(d.data._pkg || d.data.name);
+      })
+      .attr('rx', effLevel === 0 ? 4 : 2);
 
     nodes.append('text')
-      .attr('class', 'node-label')
-      .attr('x', 6).attr('y', 15)
+      .attr('class', effLevel === 0 ? 'node-label node-label--cat' : 'node-label')
+      .attr('x', effLevel === 0 ? 12 : 6).attr('y', effLevel === 0 ? 24 : 15)
       .text(d => {
-        const w = d.x1 - d.x0 - 12;
-        const name = focusedPkg
+        const w = d.x1 - d.x0 - 24;
+        const charPx = effLevel === 0 ? 9 : 6.5;
+        const minW = effLevel === 0 ? 50 : 30;
+        if (w < minW) return '';
+        const maxChars = Math.floor(w / charPx);
+        if (maxChars < 4) return '';
+        const name = (effLevel === 2)
           ? ((d.data.name || '').split('/').slice(-2).join('/'))
           : (d.data.name || '');
-        if (w < 30) return '';
-        const maxChars = Math.floor(w / 6.5);
-        if (maxChars < 4) return '';
         return name.length <= maxChars ? name : name.slice(0, maxChars - 1) + '…';
       });
 
     nodes.append('text')
-      .attr('class', 'node-size')
-      .attr('x', 6).attr('y', 28)
+      .attr('class', effLevel === 0 ? 'node-size node-size--cat' : 'node-size')
+      .attr('x', effLevel === 0 ? 12 : 6)
+      .attr('y', effLevel === 0 ? 44 : 28)
       .text(d => {
-        const w = d.x1 - d.x0;
-        const h = d.y1 - d.y0;
-        if (w < 60 || h < 36) return '';
+        const w = d.x1 - d.x0, h = d.y1 - d.y0;
+        const minW = effLevel === 0 ? 80 : 60;
+        const minH = effLevel === 0 ? 60 : 36;
+        if (w < minW || h < minH) return '';
         return formatBytes(d.value || 0);
       });
 
-    if (prevStats) {
+    if (prevStats && effLevel === 1) {
       nodes.append('text')
         .attr('class', function(d) {
           const pkgName = d.data._pkg || d.data.name;
@@ -358,12 +483,11 @@
           if (delta === null) return 'node-delta node-delta--same';
           return delta > 0 ? 'node-delta node-delta--up' : delta < 0 ? 'node-delta node-delta--down' : 'node-delta node-delta--same';
         })
-        .attr('x', function(d) { return Math.max(0, d.x1 - d.x0) - 6; })
+        .attr('x', d => Math.max(0, d.x1 - d.x0) - 6)
         .attr('y', 14)
         .attr('text-anchor', 'end')
         .text(function(d) {
-          const w = d.x1 - d.x0;
-          const h = d.y1 - d.y0;
+          const w = d.x1 - d.x0, h = d.y1 - d.y0;
           if (w < 50 || h < 20) return '';
           const pkgName = d.data._pkg || d.data.name;
           const prevPkg = prevPkgMap.get(pkgName);
@@ -374,7 +498,7 @@
         });
     }
 
-    if (currentFilter && !focusedPkg) {
+    if (currentFilter && effLevel === 1) {
       nodes.classed('dimmed', d => {
         const pkgName = d.data._pkg || d.data.name || '';
         if (pkgName.toLowerCase().includes(currentFilter)) return false;
@@ -388,10 +512,10 @@
         const pkgName = d.data._pkg || d.data.name || '';
         const pct = d.value && stats.totalBytes ? (d.value / stats.totalBytes * 100).toFixed(1) : '0';
         tooltip.innerHTML =
-          '<div class="tooltip__name">' + escapeHtml(focusedPkg ? (d.data.name || '').split('/').slice(-1)[0] : pkgName) + '</div>' +
+          '<div class="tooltip__name">' + escapeHtml(effLevel === 2 ? (d.data.name || '').split('/').slice(-1)[0] : pkgName) + '</div>' +
           '<div class="tooltip__row"><span>Size</span><span>' + escapeHtml(formatBytes(d.value || 0)) + '</span></div>' +
           '<div class="tooltip__row"><span>Share</span><span>' + escapeHtml(pct) + '%</span></div>' +
-          (focusedPkg ? '' : '<div class="tooltip__row"><span>Files</span><span>' + escapeHtml(String((pkgMap.get(pkgName) || { files: [] }).files.length)) + '</span></div>') +
+          (effLevel === 2 ? '' : '<div class="tooltip__row"><span>Files</span><span>' + escapeHtml(String((pkgMap.get(pkgName) || { files: [] }).files.length)) + '</span></div>') +
           '<div class="tooltip__bar-track"><div class="tooltip__bar-fill" style="width:' + escapeHtml(pct) + '%"></div></div>';
 
         tooltip.classList.add('visible');
@@ -408,13 +532,20 @@
       })
       .on('mouseleave', () => tooltip.classList.remove('visible'))
       .on('click', function (_event, d) {
-        if (selectedNode) d3.select(selectedNode).classed('selected', false);
-        selectedNode = this;
-        d3.select(this).classed('selected', true);
         if (d.data._isOther) {
+          if (selectedNode) d3.select(selectedNode).classed('selected', false);
+          selectedNode = this;
+          d3.select(this).classed('selected', true);
           showOtherSidebar(d.data._groupedPackages);
           return;
         }
+        if (level < 2 && !d.data._pkg) {
+          drillInto(d.data.name);
+          return;
+        }
+        if (selectedNode) d3.select(selectedNode).classed('selected', false);
+        selectedNode = this;
+        d3.select(this).classed('selected', true);
         const pkgName = d.data._pkg || d.data.name;
         const pkg = pkgMap.get(pkgName) || { name: pkgName, size: d.value, files: d.data.files || [] };
         showSidebar(pkg);
@@ -422,42 +553,13 @@
 
     const countEl = document.getElementById('search-count');
     if (countEl) {
-      if (currentFilter && !focusedPkg) {
-        const total = root.children
-          ? root.children.reduce((n, c) => n + (c.children ? c.children.length : 0), 0)
-          : 0;
-        countEl.textContent = dataChildren.length + ' / ' + total;
+      if (currentFilter && effLevel === 1) {
+        countEl.textContent = dataChildren.length + ' matches';
       } else {
         countEl.textContent = '';
       }
     }
   }
-
-  function enterFocusMode(pkgName) {
-    focusedPkg = pkgName;
-    const breadcrumb    = document.getElementById('breadcrumb');
-    const breadcrumbPkg = document.getElementById('breadcrumb-pkg');
-    if (breadcrumb)    breadcrumb.style.display = 'flex';
-    if (breadcrumbPkg) breadcrumbPkg.textContent = pkgName;
-    render(currentFilter);
-    encodeState();
-  }
-
-  function exitFocusMode() {
-    focusedPkg = null;
-    selectedNode = null;
-    const breadcrumb = document.getElementById('breadcrumb');
-    if (breadcrumb) breadcrumb.style.display = 'none';
-    const overview = document.getElementById('sb-overview');
-    const sidebarContent = document.querySelector('.sidebar-content');
-    if (overview) overview.style.display = '';
-    if (sidebarContent) sidebarContent.style.display = 'none';
-    render(currentFilter);
-    encodeState();
-  }
-
-  const breadcrumbBack = document.getElementById('breadcrumb-back');
-  if (breadcrumbBack) breadcrumbBack.addEventListener('click', exitFocusMode);
 
   // --- Sidebar ---
   function showSidebar(pkg) {
@@ -692,6 +794,14 @@
     });
   }
 
+  // --- View toggle (flat <-> grouped) ---
+  const viewToggleBtn = document.getElementById('view-toggle');
+  if (viewToggleBtn) {
+    viewToggleBtn.addEventListener('click', () => {
+      setViewMode(viewMode === 'flat' ? 'grouped' : 'flat');
+    });
+  }
+
   // --- Reset button ---
   const resetBtn = document.getElementById('controls-reset');
   if (resetBtn) {
@@ -711,8 +821,8 @@
       if (searchEl) searchEl.focus();
     }
     if (e.key === 'Escape') {
-      if (focusedPkg !== null) {
-        exitFocusMode();
+      if (drillPath.length > 0 && document.activeElement !== searchEl) {
+        drillToLevel(drillPath.length - 1);
       } else if (document.activeElement === searchEl) {
         searchEl.blur();
         if (searchEl.value) {
@@ -741,8 +851,9 @@
   // --- Permalink ---
   function encodeState() {
     const parts = [];
+    if (viewMode === 'grouped') parts.push('view=grouped');
     if (currentFilter) parts.push('q=' + encodeURIComponent(currentFilter));
-    if (focusedPkg)    parts.push('pkg=' + encodeURIComponent(focusedPkg));
+    if (drillPath.length > 0) parts.push('drill=' + drillPath.map(encodeURIComponent).join('/'));
     if (minSizeBytes > 0) parts.push('min=' + Math.round(minSizeBytes / 1024));
     if (hiddenCategories.size > 0) {
       parts.push('cat=' + [...hiddenCategories].map(c => '-' + c).join(','));
@@ -753,19 +864,33 @@
   function restoreState() {
     if (!location.hash) return;
     const params = new URLSearchParams(location.hash.slice(1));
+    const view = params.get('view');
+    if (view === 'grouped') {
+      viewMode = 'grouped';
+      const btn = document.getElementById('view-toggle');
+      const lbl = document.getElementById('view-toggle-label');
+      if (btn) btn.setAttribute('aria-pressed', 'true');
+      if (lbl) lbl.textContent = 'Ungroup';
+    }
     const q   = params.get('q');
-    const pkg = params.get('pkg');
     if (q && searchEl) {
       searchEl.value = q;
       currentFilter = q.toLowerCase();
       if (searchClearEl) searchClearEl.style.display = 'block';
     }
-    if (pkg) {
-      focusedPkg = pkg;
-      const breadcrumb    = document.getElementById('breadcrumb');
-      const breadcrumbPkg = document.getElementById('breadcrumb-pkg');
-      if (breadcrumb)    breadcrumb.style.display = 'flex';
-      if (breadcrumbPkg) breadcrumbPkg.textContent = pkg;
+    const drill = params.get('drill');
+    const legacyPkg = params.get('pkg');
+    if (drill) {
+      drillPath = drill.split('/').map(decodeURIComponent);
+      updateBreadcrumb();
+    } else if (legacyPkg) {
+      if (viewMode === 'grouped') {
+        const cat = window.MBV_HIERARCHY.categoryOf(legacyPkg);
+        drillPath = [cat, legacyPkg];
+      } else {
+        drillPath = [legacyPkg];
+      }
+      updateBreadcrumb();
     }
     const min = params.get('min');
     if (min) {
