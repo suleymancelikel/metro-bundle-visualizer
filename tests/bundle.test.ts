@@ -1,4 +1,4 @@
-import { buildTempConfigContent, BundleOptions } from '../src/bundle';
+import { buildTempConfigContent, BundleOptions, isMetroNoise } from '../src/bundle';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -167,5 +167,32 @@ describe('buildTempConfigContent()', () => {
 
       expect(content).toContain(JSON.stringify(metroConfig));
     });
+  });
+});
+
+describe('isMetroNoise()', () => {
+  const noise = [
+    '=================================================================================================',
+    'From React Native 0.73, your project\'s Metro config should extend \'@react-native/metro-config\'',
+    'or it will fail to build. Please copy the template at:',
+    'https://github.com/react-native-community/template/blob/main/template/metro.config.js',
+    'This warning will be removed in future (https://github.com/facebook/metro/issues/1018).',
+    '● Validation Warning:',
+    'Unknown option "server.tls" with value false was found.',
+    'This is probably a typing mistake. Fixing it will remove this message.',
+    'Fixing it will remove this message.',
+  ];
+  it.each(noise)('filters: %s', (line) => {
+    expect(isMetroNoise(line)).toBe(true);
+  });
+
+  const signal = [
+    'error: bundling failed: SyntaxError in src/App.tsx',
+    'TransformError: Unable to resolve module react-native-foo',
+    'info Writing bundle output to: /tmp/bundle.js',
+    '',
+  ];
+  it.each(signal)('keeps: %s', (line) => {
+    expect(isMetroNoise(line)).toBe(false);
   });
 });

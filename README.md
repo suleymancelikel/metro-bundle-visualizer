@@ -36,12 +36,16 @@ metro-bundle-visualizer [options]
 
 Options:
   -p, --platform <ios|android>   Platform to bundle for (default: "ios")
-  --dev                          Bundle in dev mode (default: false)
+  --dev                          Bundle in dev mode (default: production)
   --entry <path>                 Entry file (default: auto-detected from package.json "main")
   -o, --out <path>               Output HTML path (default: "./bundle-report.html")
   --no-open                      Don't open browser automatically
   --reset-cache                  Reset Metro cache before bundling
-  --budget <bytes>               Warn if bundle size exceeds this threshold
+  --project-root <path>          Override cwd as the project root
+  --json [path]                  Write bundle stats JSON (default: ./bundle-stats.json)
+  --quiet                        Suppress progress output (errors always shown)
+  --verbose                      Show full Metro output (deprecation/validation warnings)
+  --budget <size>                Warn if bundle exceeds threshold (e.g. 3mb, 500kb, 1048576)
   --compare <path>               Show size deltas against a previous report
   -V, --version                  Print version
   -h, --help                     Show help
@@ -64,10 +68,12 @@ npx metro-bundle-visualizer --no-open --out ./reports/bundle.html
 
 ```bash
 # Warn if bundle exceeds 3 MB
-npx metro-bundle-visualizer --budget 3145728
+npx metro-bundle-visualizer --budget 3mb
+
+# Equivalent forms: 3072kb, 3145728
 ```
 
-A warning banner appears at the top of the report showing how much the budget was exceeded.
+`--budget` accepts a number with optional suffix (`b`, `kb`, `mb`, `gb`). A warning banner appears at the top of the report showing how much the budget was exceeded.
 
 ### Comparison mode
 
@@ -80,21 +86,37 @@ Each package tile shows a `+X KB` / `-X KB` badge. The sidebar includes a "vs pr
 
 ### Expected output
 
+In an interactive terminal:
+
 ```
-metro-bundle-visualizer v0.2.0
+ MBV  v0.2.0
 
-Project:  /your/rn/project
-Entry:    index.js
-Platform: ios
-Mode:     production
+  ›  project   your-rn-project  (ios · production)
+  ›  entry     index.js
+  ›  config    ./metro.config.js
 
-Bundling…
+✓ Bundled 47.2s
 
-Bundle complete — 44.3 MB (3241 modules)
+  ┌─ bundle ──────────────────────────────────────────┐
+  │ 44.3 MB total  ·  3,241 modules                   │
+  │                                                   │
+  │ ▸ react-native                       4.8 MB  10.8%│
+  │ ▸ @react-navigation/native           2.1 MB   4.7%│
+  │ ▸ react-native-reanimated            1.6 MB   3.6%│
+  └───────────────────────────────────────────────────┘
 
-Report saved to: ./bundle-report.html
-Opened in browser.
+  →  ./bundle-report.html  (opened in browser)
 ```
+
+In CI or when piping to a file the spinner is automatically replaced with line-per-event output:
+
+```
+→ Bundling with Metro
+✓ Bundled (47.2s)
+…
+```
+
+Use `--quiet` to suppress everything except the final JSON path and any real errors. Use `--verbose` to surface Metro's own deprecation banners and validation warnings (muted by default).
 
 ## Report Features
 
