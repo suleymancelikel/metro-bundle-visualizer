@@ -13,7 +13,7 @@ describe('resolveProjectRoot', () => {
   });
 
   it('returns the path unchanged when flag is already absolute', () => {
-    const abs = '/absolute/path/to/project';
+    const abs = path.resolve('/absolute/path/to/project');
     expect(resolveProjectRoot(abs)).toBe(abs);
   });
 });

@@ -15,6 +15,10 @@ const config: Config = {
       lines: 0,
       statements: 0,
     },
+    './src/cli.ts': {
+      lines: 40,
+      statements: 40,
+    },
   },
   coverageReporters: ['text', 'lcov'],
   collectCoverageFrom: [
