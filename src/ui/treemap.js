@@ -243,6 +243,19 @@
     const bc = document.getElementById('breadcrumb');
     if (!bc) return;
     while (bc.firstChild) bc.removeChild(bc.firstChild);
+    if (drillPath.length === 0) return;
+
+    const sep0 = document.createElement('span');
+    sep0.className = 'breadcrumb__sep';
+    sep0.textContent = '›';
+    bc.appendChild(sep0);
+    const home = document.createElement('button');
+    home.className = 'breadcrumb__seg breadcrumb__seg--home';
+    home.textContent = 'All';
+    home.title = viewMode === 'grouped' ? 'Back to categories' : 'Back to all packages';
+    home.addEventListener('click', () => drillToLevel(0));
+    bc.appendChild(home);
+
     for (let i = 0; i < drillPath.length; i++) {
       const sep = document.createElement('span');
       sep.className = 'breadcrumb__sep';
