@@ -31,6 +31,22 @@
         <span class="meta" id="meta"></span>
       </div>
     </header>
+    <div class="controls" id="controls">
+      <div class="controls__group" id="cat-chips">
+        <span class="controls__label">Categories</span>
+        <button class="chip" data-cat="app"><span class="chip__dot chip__dot--app"></span>&lt;app&gt;</button>
+        <button class="chip" data-cat="react-native"><span class="chip__dot chip__dot--rn"></span>@react-native</button>
+        <button class="chip" data-cat="babel"><span class="chip__dot chip__dot--babel"></span>@babel</button>
+        <button class="chip" data-cat="scoped"><span class="chip__dot chip__dot--scoped"></span>scoped</button>
+        <button class="chip" data-cat="other"><span class="chip__dot chip__dot--other"></span>other</button>
+      </div>
+      <div class="controls__group">
+        <label class="controls__label" for="min-size">Min size</label>
+        <input type="range" id="min-size" min="0" max="100" value="20" step="1">
+        <span class="controls__value" id="min-size-value">10 KB</span>
+      </div>
+      <button class="controls__reset" id="controls-reset" style="display:none">Reset</button>
+    </div>
     <main class="main">
       <div class="treemap-wrap">
         <div class="breadcrumb" id="breadcrumb" style="display:none">
@@ -58,7 +74,7 @@
   </div>
   <p class="sb-section-title" style="margin-top:14px">Top packages</p>
   <ul class="file-bars" id="sb-top-list"></ul>
-  <p class="sb-hint">Click a package to inspect its files</p>
+  <p class="sb-hint" id="sb-filter-summary">Click a package to inspect its files</p>
 </div>
         <div class="sidebar-content" style="display:none">
           <div class="sb-header">

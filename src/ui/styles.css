@@ -341,3 +341,89 @@ body {
 .tooltip__bar-fill { height: 100%; background: var(--accent); border-radius: 2px; }
 
 .treemap-empty-state { fill: var(--text-3); font-size: 15px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+
+/* --- Controls strip --- */
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+  font-size: 12px;
+}
+.controls__group { display: flex; align-items: center; gap: 8px; }
+.controls__label {
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-size: 10px;
+  font-weight: 600;
+}
+.controls__value {
+  color: var(--text-1);
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  min-width: 48px;
+  font-size: 11px;
+}
+.controls__reset {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text-2);
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+}
+.controls__reset:hover { color: var(--text-1); border-color: var(--accent); }
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  background: var(--bg-2);
+  color: var(--text-1);
+  border-radius: 999px;
+  font-size: 11px;
+  cursor: pointer;
+  transition: opacity 120ms, background 120ms, border-color 120ms;
+}
+.chip:hover { background: var(--bg-3); border-color: var(--border-strong); }
+.chip.chip--off { opacity: 0.42; color: var(--text-2); }
+.chip__dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.chip__dot--app    { background: #ff6b35; }
+.chip__dot--rn     { background: #4a5568; }
+.chip__dot--babel  { background: #6b46c1; }
+.chip__dot--scoped { background: #0891b2; }
+.chip__dot--other  { background: #2d6a8c; }
+
+#min-size {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 160px;
+  height: 4px;
+  background: var(--border);
+  border-radius: 2px;
+  outline: none;
+}
+#min-size::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  cursor: pointer;
+}
+#min-size::-moz-range-thumb {
+  width: 14px; height: 14px;
+  background: var(--accent);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+}
+
+.node--other rect { fill: var(--bg-2) !important; stroke: var(--border); }
+.node--other .node-label { font-style: italic; fill: var(--text-2); }
