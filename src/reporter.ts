@@ -194,7 +194,9 @@ class PlainReporter implements Reporter {
 
 export function createReporter(opts: ReporterOptions = {}): Reporter {
   const tty = opts.isTTY ?? Boolean(process.stdout.isTTY);
-  const ci = opts.isCI ?? Boolean(process.env.CI);
+  // process.env.CI can be 'false' (some users export it explicitly in dotfiles
+  // to opt out of CI-mode tooling); Boolean('false') is truthy so check value.
+  const ci = opts.isCI ?? (!!process.env.CI && process.env.CI !== 'false' && process.env.CI !== '0');
   const useTTY = tty && !ci && !opts.quiet;
   return useTTY ? new TTYReporter(opts) : new PlainReporter(opts);
 }

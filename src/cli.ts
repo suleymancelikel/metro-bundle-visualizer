@@ -170,7 +170,9 @@ async function main(): Promise<void> {
   }
 
   reporter.startPhase('Bundling with Metro');
-  const hintTimer = !opts.quiet
+  // Hint only makes sense under the spinner — in CI/Plain the phase-per-line
+  // output already tells the user something is happening.
+  const hintTimer = reporter.isInteractive && !opts.quiet
     ? setTimeout(() => {
         reporter.note('  (first run / cold cache can take 30-60s — Metro is building the dependency graph)');
       }, 5000)

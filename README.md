@@ -36,7 +36,7 @@ metro-bundle-visualizer [options]
 
 Options:
   -p, --platform <ios|android>   Platform to bundle for (default: "ios")
-  --dev                          Bundle in dev mode (default: production)
+  --dev                          Bundle in dev mode (default: false → production)
   --entry <path>                 Entry file (default: auto-detected from package.json "main")
   -o, --out <path>               Output HTML path (default: "./bundle-report.html")
   --no-open                      Don't open browser automatically
@@ -98,11 +98,11 @@ In an interactive terminal:
 ✓ Bundled 47.2s
 
   ┌─ bundle ──────────────────────────────────────────┐
-  │ 44.3 MB total  ·  3,241 modules                   │
+  │ 44.30 MB total  ·  3,241 modules                  │
   │                                                   │
-  │ ▸ react-native                       4.8 MB  10.8%│
-  │ ▸ @react-navigation/native           2.1 MB   4.7%│
-  │ ▸ react-native-reanimated            1.6 MB   3.6%│
+  │ ▸ react-native                      4.80 MB  10.8%│
+  │ ▸ @react-navigation/native          2.10 MB   4.7%│
+  │ ▸ react-native-reanimated           1.60 MB   3.6%│
   └───────────────────────────────────────────────────┘
 
   →  ./bundle-report.html  (opened in browser)
@@ -116,7 +116,7 @@ In CI or when piping to a file the spinner is automatically replaced with line-p
 …
 ```
 
-Use `--quiet` to suppress everything except the final JSON path and any real errors. Use `--verbose` to surface Metro's own deprecation banners and validation warnings (muted by default).
+Use `--quiet` to suppress progress output; real errors still go to stderr and, if `--json <path>` is also passed, the resolved JSON path is the only thing printed to stdout (designed for piping into `jq`/CI). Use `--verbose` to surface Metro's own deprecation banners and validation warnings (muted by default).
 
 ## Report Features
 
@@ -127,7 +127,7 @@ The generated `bundle-report.html` is a self-contained interactive report:
 - **Click to inspect** — select any package to see its size, percentage share, file count, and top files with proportional size bars
 - **Search** — filter packages by name or file path; press `/` to focus, `Esc` to clear
 - **Accurate sizes** — post-transform, pre-minification byte counts (expect ~20–40% larger than the shipped binary)
-- **Budget warnings** — pass `--budget <bytes>` to show a warning banner if the bundle exceeds the threshold
+- **Budget warnings** — pass `--budget <size>` (e.g. `3mb`) to show a warning banner if the bundle exceeds the threshold
 - **Comparison mode** — pass `--compare <prev-report.html>` to overlay `+/−` size deltas on every package; sidebar shows "vs prev" metric
 
 ## How It Works

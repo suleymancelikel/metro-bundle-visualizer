@@ -68,10 +68,15 @@ describe('relativizePath()', () => {
     expect(relativizePath('/a/b/c', '/a/b/c')).toBe('.');
   });
   it('normalizes backslashes to forward slashes', () => {
-    // path.posix.relative returns POSIX separators on macOS/Linux test runs,
-    // so simulate the Windows shape directly by passing already-mixed input.
-    // The function should produce no backslashes in its output.
-    const out = relativizePath('/a/b/c/sub/file.js', '/a/b/c');
+    // path.relative on POSIX treats '\' as a regular filename char (not a
+    // separator), so passing a path with a literal backslash yields a relative
+    // result that still contains the backslash — which exercises the
+    // .replace(/\\\\/g, '/') step in relativizePath. On Windows runners the
+    // same code path is triggered naturally because '\' IS the separator.
+    const cwd = '/a/b/c';
+    const p = '/a/b/c/sub\\file.js';
+    const out = relativizePath(p, cwd);
+    expect(out).toBe('./sub/file.js');
     expect(out).not.toMatch(/\\/);
   });
 });
