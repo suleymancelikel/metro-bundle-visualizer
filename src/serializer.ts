@@ -105,11 +105,9 @@ export function captureSerializer(
       return originalSerializer(entryPoint, prepend, graph, options);
     }
 
-    // Fallback: concatenate all JS module codes
-    const allCode = [...graph.dependencies.values()]
-      .map(m => m.output?.find(isJsOutput)?.data?.code ?? '')
-      .join('\n');
-
-    return allCode;
+    // No custom serializer in user config (normal case for most RN projects).
+    // The bundle output file is deleted immediately after bundling — only the
+    // stats JSON above is needed. Return empty string to satisfy Metro.
+    return '';
   };
 }

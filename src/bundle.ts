@@ -13,6 +13,28 @@ export interface BundleOptions {
   dev: boolean;
   statsOutputPath: string;
   resetCache?: boolean;
+  quiet?: boolean;
+  verbose?: boolean;
+  onStdoutLine?: (line: string) => void;
+  onStderrLine?: (line: string, kind: 'noise' | 'signal') => void;
+}
+
+const METRO_NOISE_PATTERNS: RegExp[] = [
+  /^=+$/,
+  /^From React Native \d/,
+  /react-native-community\/template/,
+  /This warning will be removed/,
+  /metro\/issues/,
+  /^● Validation Warning/,
+  /^Unknown option /,
+  /^This is probably a typing mistake/,
+  /^Fixing it will remove this message/,
+  /^or it will fail to build/,
+  /^Please copy the template/,
+];
+
+export function isMetroNoise(line: string): boolean {
+  return METRO_NOISE_PATTERNS.some((re) => re.test(line));
 }
 
 // ─── buildTempConfigContent ───────────────────────────────────────────────────
@@ -88,6 +110,10 @@ function spawnBundle(
     bundleOutput: string;
     config: string;
     resetCache: boolean;
+    quiet: boolean;
+    verbose: boolean;
+    onStdoutLine?: (line: string) => void;
+    onStderrLine?: (line: string, kind: 'noise' | 'signal') => void;
   },
 ): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -115,13 +141,15 @@ function spawnBundle(
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
+    const stderrLines: string[] = [];
+
     child.stdout.on('data', (chunk: Buffer) => {
+      if (opts.quiet) return;
       const lines = chunk.toString().split('\n');
       for (const line of lines) {
         const trimmed = line.trim();
-        if (trimmed) {
-          process.stdout.write(`\r${trimmed}`);
-        }
+        if (!trimmed) continue;
+        opts.onStdoutLine?.(trimmed);
       }
     });
 
@@ -129,10 +157,16 @@ function spawnBundle(
       const lines = chunk.toString().split('\n');
       for (const line of lines) {
         const trimmed = line.trim();
-        // Filter WARN lines — don't show them
-        if (trimmed && !trimmed.startsWith('WARN')) {
-          process.stderr.write(`${trimmed}\n`);
-        }
+        if (!trimmed) continue;
+        stderrLines.push(trimmed);
+        if (stderrLines.length > 50) stderrLines.shift();
+        const noise =
+          !opts.verbose &&
+          (trimmed.toLowerCase().startsWith('warn') || isMetroNoise(trimmed));
+        // --quiet suppresses noise; signal-level stderr (real errors) always
+        // surfaces because the flag is documented as "errors always shown".
+        if (noise && opts.quiet) continue;
+        opts.onStderrLine?.(trimmed, noise ? 'noise' : 'signal');
       }
     });
 
@@ -140,7 +174,8 @@ function spawnBundle(
       if (code === 0) {
         resolve();
       } else {
-        reject(new Error(`react-native bundle exited with code ${code ?? 'null'}`));
+        const detail = stderrLines.length > 0 ? `\n${stderrLines.join('\n')}` : '';
+        reject(new Error(`react-native bundle exited with code ${code ?? 'null'}${detail}`));
       }
     });
 
@@ -165,6 +200,8 @@ export async function runBundle(options: BundleOptions): Promise<void> {
     platform,
     dev,
     resetCache = false,
+    quiet = false,
+    verbose = false,
   } = options;
 
   const tempConfig = writeTempConfig(options);
@@ -178,9 +215,12 @@ export async function runBundle(options: BundleOptions): Promise<void> {
       bundleOutput,
       config: tempConfig,
       resetCache,
+      quiet,
+      verbose,
+      onStdoutLine: options.onStdoutLine,
+      onStderrLine: options.onStderrLine,
     });
   } finally {
-    // Clean up temp files regardless of success or failure
     for (const file of [tempConfig, bundleOutput]) {
       try {
         fs.unlinkSync(file);

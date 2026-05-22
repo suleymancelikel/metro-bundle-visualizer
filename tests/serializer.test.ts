@@ -134,7 +134,7 @@ describe('captureSerializer', () => {
     expect(result).toBe('__original_bundle__');
   });
 
-  it('uses fallback concatenation when no original serializer is provided', async () => {
+  it('returns empty string and still writes stats when no original serializer is provided', async () => {
     const statsPath = path.join(tmpDir, 'stats.json');
 
     const graph = makeGraph([
@@ -145,9 +145,13 @@ describe('captureSerializer', () => {
     const serializer = captureSerializer(undefined, statsPath, 'ios');
     const result = await serializer('index.js', [], graph, { platform: 'ios' });
 
-    // Fallback joins all codes with '\n'
-    expect(result).toContain('var a=1;');
-    expect(result).toContain('var b=2;');
+    // Returns empty string — bundle output is deleted immediately, only stats matter
+    expect(result).toBe('');
+
+    expect(fs.existsSync(statsPath)).toBe(true);
+    const stats = JSON.parse(fs.readFileSync(statsPath, 'utf8'));
+    expect(stats.modules).toHaveLength(2);
+    expect(stats.modules.find((m: { path: string }) => m.path === '/project/src/a.js')).toBeDefined();
   });
 
   it('creates the parent directory with mkdirSync when it does not exist', async () => {

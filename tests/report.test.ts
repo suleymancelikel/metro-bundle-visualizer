@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { generateReport } from '../src/report';
+import { generateReport, extractStatsFromReport } from '../src/report';
 import type { BundleStats } from '../src/serializer';
 
 const mockStats: BundleStats = {
@@ -70,6 +70,174 @@ describe('generateReport', () => {
     });
   });
 
+  it('writes a stderr warning when a UI asset is missing', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      const stderrSpy = jest.spyOn(process.stderr, 'write').mockReturnValue(true);
+
+      // In the test environment __dirname resolves to src/, so d3.min.js is absent
+      generateReport(mockStats, outputPath);
+
+      expect(stderrSpy).toHaveBeenCalledWith(
+        expect.stringContaining('missing UI asset:'),
+      );
+
+      stderrSpy.mockRestore();
+    });
+  });
+
+  it('injects CSS design tokens into generated report', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('--bg-0:');
+      expect(html).toContain('--accent:');
+      expect(html).toContain('--text-1:');
+    });
+  });
+
+  it('generated HTML contains hero-stat element', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('class="hero-stat"');
+      expect(html).toContain('class="hero-stat__value"');
+    });
+  });
+
+  it('generated HTML contains platform badge', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('class="platform-badge"');
+    });
+  });
+
+  it('generated HTML contains search hint kbd', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('class="search-hint"');
+    });
+  });
+
+  it('generated HTML contains breadcrumb element', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('id="breadcrumb"');
+    });
+  });
+
+  it('generated HTML contains search result counter', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('id="search-count"');
+    });
+  });
+
+  it('generated HTML contains sidebar overview section', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('id="sb-overview"');
+      expect(html).toContain('id="sb-top-list"');
+    });
+  });
+
+  it('injects budget threshold into generated report when provided', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath, { budget: 2 * 1024 * 1024 });
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('__BUNDLE_BUDGET__');
+      expect(html).toContain('2097152');
+    });
+  });
+
+  it('injects budget before treemap script so it is defined when read', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath, { budget: 1024 });
+      const html = fs.readFileSync(outputPath, 'utf8');
+      const budgetIdx = html.indexOf('window.__BUNDLE_BUDGET__ =');
+      const treemapReadIdx = html.indexOf('window.__BUNDLE_BUDGET__ != null');
+      expect(budgetIdx).toBeGreaterThan(-1);
+      expect(treemapReadIdx).toBeGreaterThan(-1);
+      expect(budgetIdx).toBeLessThan(treemapReadIdx);
+    });
+  });
+
+  it('injects previous stats before treemap script', () => {
+    const prevStats: BundleStats = {
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      platform: 'ios',
+      totalBytes: 5000000,
+      modules: [{ path: 'index.js', size: 5000000, package: '<app>' }],
+    };
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath, { previousStats: prevStats });
+      const html = fs.readFileSync(outputPath, 'utf8');
+      const prevIdx = html.indexOf('window.__PREV_STATS__ =');
+      const treemapReadIdx = html.indexOf('__PREV_STATS__ ||');
+      expect(prevIdx).toBeGreaterThan(-1);
+      expect(treemapReadIdx).toBeGreaterThan(-1);
+      expect(prevIdx).toBeLessThan(treemapReadIdx);
+    });
+  });
+
+  it('does not inject budget assignment when not provided', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).not.toContain('window.__BUNDLE_BUDGET__ =');
+    });
+  });
+
+  it('injects previous stats into generated report when provided', () => {
+    const prevStats: BundleStats = {
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      platform: 'ios',
+      totalBytes: 5000000,
+      projectName: 'OldApp',
+      modules: [{ path: 'index.js', size: 5000000, package: '<app>' }],
+    };
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath, { previousStats: prevStats });
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('__PREV_STATS__');
+      expect(html).toContain('5000000');
+    });
+  });
+
+  it('extracts stats from a generated report HTML', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      const extracted = extractStatsFromReport(html);
+      expect(extracted).not.toBeNull();
+      expect(extracted!.totalBytes).toBe(mockStats.totalBytes);
+      expect(extracted!.modules).toHaveLength(mockStats.modules.length);
+    });
+  });
+
+  it('extractStatsFromReport returns null if stats not found in HTML', () => {
+    const result = extractStatsFromReport('<html><body>no stats here</body></html>');
+    expect(result).toBeNull();
+  });
+
   it('escapes </script> sequences in injected JSON (XSS prevention)', () => {
     const maliciousStats: BundleStats = {
       ...mockStats,
@@ -90,6 +258,35 @@ describe('generateReport', () => {
       expect(html).not.toContain('</script><script>alert(1)</script>');
       // The escaped form should be present instead
       expect(html).toContain('\\u003c/script\\u003e');
+    });
+  });
+
+  it('renders the controls strip with chips and slider', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      expect(html).toContain('id="controls"');
+      expect(html).toContain('data-cat="app"');
+      expect(html).toContain('data-cat="react-native"');
+      expect(html).toContain('data-cat="babel"');
+      expect(html).toContain('data-cat="scoped"');
+      expect(html).toContain('data-cat="other"');
+      expect(html).toContain('id="min-size"');
+      expect(html).toContain('id="controls-reset"');
+      expect(html).toContain('id="sb-filter-summary"');
+    });
+  });
+
+  it('injects hierarchy.js before treemap.js', () => {
+    withTmpDir(dir => {
+      const outputPath = path.join(dir, 'report.html');
+      generateReport(mockStats, outputPath);
+      const html = fs.readFileSync(outputPath, 'utf8');
+      const hIdx = html.indexOf('MBV_HIERARCHY');
+      const tIdx = html.indexOf('KNOWN_HEAVY');
+      expect(hIdx).toBeGreaterThan(0);
+      expect(tIdx).toBeGreaterThan(hIdx);
     });
   });
 });

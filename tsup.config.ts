@@ -22,7 +22,7 @@ export default defineConfig({
     const uiDest = resolve('dist/ui');
     mkdirSync(uiDest, { recursive: true });
 
-    for (const file of ['template.html', 'styles.css', 'treemap.js']) {
+    for (const file of ['template.html', 'styles.css', 'hierarchy.js', 'treemap.js']) {
       const src = join(uiSrc, file);
       if (existsSync(src)) {
         copyFileSync(src, join(uiDest, file));
